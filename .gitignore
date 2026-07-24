@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+mlruns/
+mlartifacts/
+data/raw/*.csv
+data/batches/*.csv
+reports/*.html
+.dvc/cache
+
+# macOS
+.DS_Store

@@ -1,0 +1,7 @@
+# TODO(A): flesh out after `dvc init` and `dvc add data/raw/creditcard.csv`
+stages:
+  ingest:
+    cmd: python -m src.ingest
+    deps: [src/ingest.py, data/raw/creditcard.csv]
+    params: [data]
+    outs: [data/batches]
