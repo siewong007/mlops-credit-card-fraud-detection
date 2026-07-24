@@ -1,5 +1,6 @@
-# Pinned to the versions the pipeline was developed and verified against
-# (Python 3.11–3.13). The Dockerfile builds on python:3.11-slim.
+# Pinned to the versions the pipeline was developed and verified against.
+# Requires Python >= 3.12 (xgboost 3.3.0 does not publish wheels for 3.11).
+# Verified on Python 3.13; the Dockerfile and CI both use 3.13.
 pandas==2.3.3
 numpy==2.3.5
 scikit-learn==1.7.2
