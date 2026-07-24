@@ -61,7 +61,7 @@ h2{font-size:1.15rem;margin:2.5rem 0 .75rem;padding-bottom:.4rem;border-bottom:1
 .kpi .k{color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}
 .kpi .v{font-size:1.4rem;font-weight:600;margin-top:.15rem;font-variant-numeric:tabular-nums}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{border-collapse:collapse;width:100%;min-width:640px;font-size:.9rem}
+table{border-collapse:collapse;width:100%;min-width:920px;font-size:.9rem}
 th,td{text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--line);
   font-variant-numeric:tabular-nums;white-space:nowrap}
 th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
@@ -69,7 +69,7 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .badge-ok{color:var(--ok);background:var(--ok-bg)}
 .badge-warn{color:var(--warn);background:var(--warn-bg)}
 .badge-bad{color:var(--bad);background:var(--bad-bg)}
-.reason{color:var(--muted);font-size:.82rem;white-space:normal}
+.reason{color:var(--muted);font-size:.82rem;white-space:normal;min-width:260px}
 figure{margin:0 0 1.25rem;background:var(--card);border:1px solid var(--line);
   border-radius:8px;padding:.85rem;overflow:hidden}
 figure img{width:100%;height:auto;display:block;border-radius:4px;background:#fff}
