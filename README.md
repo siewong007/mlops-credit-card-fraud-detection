@@ -28,17 +28,19 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Data.** The real Kaggle dataset (`mlg-ulb/creditcardfraud`) needs an account
-and is not committed. Two options:
+**Data.** The dataset is not committed (144 MB, git-ignored). Two options:
 
-- **Real data:** download `creditcard.csv` into `data/raw/`.
-- **Synthetic (default for dev/CI):** do nothing — `make pipeline` generates a
+- **Real data (recommended):** `make fetch-data` downloads the genuine ULB
+  dataset from its open OpenML mirror — **no Kaggle account needed**. (Or drop a
+  Kaggle `creditcard.csv` into `data/raw/` yourself.)
+- **Synthetic (offline/CI fallback):** do nothing — `make pipeline` generates a
   clearly-labelled synthetic dataset with the identical schema so the pipeline
   runs out of the box. See [notebooks/README.md](notebooks/README.md) §"data".
 
 ## Run
 
 ```bash
+make fetch-data   # download the real ULB dataset from OpenML (run once)
 make pipeline     # full workflow: (data) → ingest → validate → train →
                   # threshold → evaluate → inference → drift → trigger
 make test         # unit tests (pytest)
@@ -76,9 +78,12 @@ After `make pipeline`, `reports/` contains the testing & monitoring evidence:
 | `reports/trigger_log.md` | Retraining decision per batch, with reasons | 8 |
 | MLflow (`mlflow.db`) | Two tracked runs + registered `fraud-detector` | 7 |
 
-On the synthetic data, `prod_1`/`prod_2` pass and the drift-injected `prod_3`
-trips the trigger (PR-AUC drop, recall < floor, >30% features drifted) — the
-intended monitoring demonstration.
+On the real data, `prod_1`/`prod_2` raise a **warning** (the dataset naturally
+drifts ~40% of features across its 2-day window, but performance stays healthy)
+while the drift-injected `prod_3` trips a **retrain** (PR-AUC −89%, recall 0.55 <
+floor, 59% features drifted) — the intended monitoring demonstration. See the
+report §8 for the full analysis, including why we flag drift on PSI (not the
+KS p-value, which over-fires at this scale).
 
 ## Tools and why
 
@@ -97,7 +102,7 @@ intended monitoring demonstration.
 ## Repo structure
 
 ```
-src/            pipeline stages (one module per stage) + simulate_data.py
+src/            pipeline stages + fetch_data.py (real) / simulate_data.py (synthetic)
 tests/          pytest unit tests (13, run in CI)
 data/           raw data + time-based batches (gitignored, regenerated)
 notebooks/      baseline Kaggle notebook acknowledgement

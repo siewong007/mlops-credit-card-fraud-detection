@@ -6,10 +6,10 @@
 > this repository and is provided as a complete draft for the group to review,
 > verify, and take ownership of. Per briefing §18, every claim, figure and design
 > decision must be understood and confirmed by the authors before submission,
-> and AI assistance must be acknowledged (see §11). The quantitative results in
-> this draft were produced on a **synthetic** dataset with the identical schema
-> (see §2.4); re-run the pipeline on the real Kaggle CSV to obtain
-> submission-grade numbers — the workflow is unchanged.
+> and AI assistance must be acknowledged (see §11). The quantitative results
+> below are from the **real ULB dataset** (284,807 transactions), obtained via
+> OpenML with `make fetch-data` (see §2.4). A synthetic generator with the
+> identical schema is retained for CI and offline development.
 
 ---
 
@@ -78,18 +78,23 @@ monitoring. Any drift or retraining behaviour we demonstrate is a proof of the
 
 ### 2.4 Data used in this repository
 
-The real Kaggle CSV requires an account to download and is ~150 MB, so it is
-neither committed to the repository nor available in continuous integration. To
-keep the pipeline runnable and testable everywhere, `src/simulate_data.py`
-generates a **clearly-labelled synthetic dataset** with the identical schema and
-a realistic ~0.18% fraud rate. The fraud class carries a learnable signal — a
-handful of PCA components are mean-shifted, mirroring how features such as
-`V14`, `V4`, `V10`, `V12` and `V17` separate fraud in the real data — so that
-metrics are meaningful rather than noise. This is a development and CI fixture
-only; it is not a modelling contribution and is never presented as real data.
-Dropping the genuine `creditcard.csv` into `data/raw/` makes every downstream
-stage identical. All numeric results in this report were produced from the
-synthetic dataset and are used solely to demonstrate the workflow.
+The results in this report use the **real ULB dataset** — 284,807 transactions,
+492 frauds (0.172%), spanning the genuine two-day window (`Time` 0–172,792 s).
+The canonical source (Kaggle `mlg-ulb/creditcardfraud`) sits behind a login, so
+`src/fetch_data.py` (`make fetch-data`) downloads the identical data from its
+open **OpenML** mirror (dataset 1597). One practical detail: OpenML flags `Time`
+as a row-identifier, so the usual `fetch_openml` call silently drops it; because
+our time-based batching depends on `Time`, we download the raw parquet instead,
+which preserves all 31 columns in the canonical schema. The 144 MB CSV is not
+committed (git-ignored) — teammates and graders regenerate it with one command.
+
+For continuous integration and offline development we also provide
+`src/simulate_data.py`, a **clearly-labelled synthetic** generator with the
+identical schema and a realistic ~0.18% fraud rate, whose fraud class carries a
+learnable signal (a few PCA components mean-shifted, mirroring how `V14`, `V4`,
+`V10`, `V12`, `V17` separate fraud in the real data). It is a fixture, never
+presented as real data, so CI stays fast, deterministic and network-free. Both
+datasets flow through exactly the same pipeline.
 
 ## 3. The original workflow and its weaknesses
 
@@ -240,21 +245,25 @@ reproducible rather than a manual "save the good one" step.
 
 ### 6.3 Results and comparison
 
-On the synthetic development dataset (validation batch, default threshold 0.5):
+On the real ULB dataset (validation batch, default threshold 0.5):
 
 | Model | PR-AUC | Recall | Notes |
 |-------|--------|--------|-------|
-| Logistic Regression | **0.968** | 0.969 | promoted |
-| XGBoost | 0.929 | 0.844 | tracked |
+| Logistic Regression | **0.818** | 0.913 | promoted |
+| XGBoost | 0.794 | 0.826 | tracked |
 
-Logistic Regression wins here because the synthetic fraud signal is close to
-linearly separable by construction. On the *real* PCA-transformed data a
-gradient-boosted model typically leads; the point for this project is that the
-**promotion logic selects whichever model wins by PR-AUC**, and both runs are
-tracked and comparable in MLflow. The validation confusion matrix for the
-promoted model (threshold 0.5) is 31 true positives, 1 false negative, 12 false
-positives and 15,956 true negatives, i.e. recall 0.969 at precision 0.72 — the
-starting point the threshold stage then optimises.
+Both runs are tracked and directly comparable in MLflow; the **promotion logic
+selects whichever wins by PR-AUC** — here the class-weighted Logistic Regression,
+by a small margin over a lightly-tuned XGBoost. (Model choice is not the point of
+the project, and neither model is heavily tuned; the reorganisation is what is
+assessed.) A PR-AUC of ~0.82 is in the expected range for this dataset.
+
+The validation confusion matrix for the promoted model at the **default 0.5
+threshold** is telling: 105 true positives, 10 false negatives, but **2,296 false
+positives** (recall 0.91, precision just **0.044**). A model that blocks 2,296
+legitimate customers to catch 105 frauds is operationally useless — which is
+exactly why the fixed-0.5 notebook is inadequate (requirement 4) and why the
+threshold stage (§7.4) is essential.
 
 ![Confusion matrix](../reports/figures/confusion_matrix.png)
 ![Precision–Recall curve](../reports/figures/pr_curve.png)
@@ -302,17 +311,21 @@ matrix and PR-curve figures above as committed evidence.
 A fraud model's *operating threshold* is a business decision, not a default.
 `src/threshold.py` sweeps thresholds from 0.01 to 0.99 and picks the one that
 minimises an expected business cost, with a false negative weighted 100× a false
-positive (`params.yaml`). On the synthetic data this selects a threshold of
-**0.95** with an expected cost of 103, giving recall 0.969 at precision 0.91.
+positive (`params.yaml`). On the real data this selects a threshold of **0.98**,
+moving the model from the unusable 0.5 operating point (precision 0.044) to
+**recall 0.85 at precision 0.41** — a defensible fraud-operations trade-off that
+cuts false positives from ~2,300 to a few hundred while still catching most
+fraud.
 
 ![Threshold trade-off](../reports/figures/threshold_tradeoff.png)
 
-The trade-off figure makes the decision legible: recall stays high across a wide
-range of thresholds while precision climbs, so the cost-minimising point sits at
-a high threshold that preserves fraud detection while cutting false alarms.
-Crucially, the chosen threshold becomes the **operating point** for inference and
-the **recall baseline** for the trigger — the cost trade-off is threaded through
-the rest of the pipeline rather than being a one-off plot.
+The trade-off figure makes the decision legible: as the threshold rises,
+precision climbs steeply while recall declines gently, so the cost-minimising
+point sits at a high threshold that preserves most fraud detection while
+sharply cutting false alarms. Crucially, the chosen threshold becomes the
+**operating point** for inference and the **recall baseline** for the trigger —
+the cost trade-off is threaded through the rest of the pipeline rather than being
+a one-off plot.
 
 ## 8. Monitoring, drift analysis and the retraining trigger
 
@@ -337,18 +350,19 @@ drift.
 `src/batch_inference.py` loads the promoted model, scaler and threshold;
 **validates** each production batch against the Pandera schema; scores it; and
 writes predictions (probability, label, and the true `Class` where available)
-for the monitoring stage. On the synthetic data, `prod_1` and `prod_2` flag 20
-and 14 transactions respectively, while the drifted `prod_3` flags **0** at the
-0.95 threshold — the first visible symptom that something has changed.
+for the monitoring stage. On the real data, `prod_1` and `prod_2` flag 82 and 76
+transactions respectively at the 0.98 threshold, while the drifted `prod_3` flags
+150 — but, as §8.3 shows, most of those are false alarms because the injected
+shift has moved the real frauds out of the model's reach.
 
 ### 8.3 Drift analysis (requirement 2, briefing §12)
 
 `src/drift.py` compares each production batch against the training reference
 across all the drift areas the briefing lists:
 
-- **Feature drift** — per feature, a Kolmogorov–Smirnov test and the Population
-  Stability Index. A feature counts as drifted if PSI > 0.2 (a standard rule of
-  thumb) or the KS test is significant at p < 0.05.
+- **Feature drift** — per feature, the Population Stability Index (the drift
+  flag: PSI > 0.2, a standard rule of thumb) and a Kolmogorov–Smirnov test
+  (reported for information only — see §8.5 for why it is *not* used as the flag).
 - **Amount drift** — PSI on `Amount` specifically, an interpretable feature.
 - **Prediction drift** — PSI between the reference and batch predicted
   probability distributions.
@@ -358,20 +372,24 @@ across all the drift areas the briefing lists:
 
 Each batch produces a JSON summary (the machine-readable contract for the
 trigger), a PSI bar chart, and — when Evidently imports cleanly — a rich HTML
-report. The results on synthetic data:
+report. The results on the real data:
 
 | Batch | % features drifted | Amount PSI | Prediction PSI | PR-AUC | Recall | Verdict |
 |-------|--------------------|------------|----------------|--------|--------|---------|
-| prod_1 | 7% | 0.00 | 0.00 | 0.995 | 0.950 | stable |
-| prod_2 | 3% | 0.00 | 0.00 | 0.942 | 0.867 | stable |
-| prod_3 | 31% | 0.89 | 12.4 | 0.001 | 0.000 | drifted |
+| prod_1 | 38% | 0.00 | 0.01 | 0.810 | 0.818 | natural drift, healthy |
+| prod_2 | 41% | 0.00 | 0.01 | 0.835 | 0.849 | natural drift, healthy |
+| prod_3 | 59% | 0.28 | 2.78 | 0.088 | 0.545 | drifted + degraded |
+
+A key real-data finding: **even the un-injected batches show 38–41% feature
+drift**. The ULB features genuinely shift across the two-day window (`V1`, `V3`,
+`V28` have the largest PSI) — real, mild covariate drift, but the model's
+*performance* on those batches stays close to baseline (PR-AUC ≈ 0.81–0.84,
+recall ≈ 0.82–0.85). Only the injected `prod_3` combines heavy drift (59%,
+`Amount` PSI 0.28, prediction PSI 2.78) with a collapse in performance
+(PR-AUC 0.09, recall 0.55). This is exactly why the trigger weights
+performance-based signals, not drift counts alone (§8.4).
 
 ![PSI — drifted batch prod_3](../reports/figures/psi_prod_3.png)
-
-The PSI chart for `prod_3` shows exactly the injected signal components
-(`V4, V10, V11, V12, V14, V17`) plus `Amount` far above the threshold, while
-untouched features stay near zero — evidence that the detector localises drift
-rather than raising a blanket alarm.
 
 ### 8.4 The retraining trigger (requirement 8, briefing §13)
 
@@ -379,8 +397,8 @@ rather than raising a blanket alarm.
 
 > **Retrain or review** the model if the batch PR-AUC drops more than **10%**
 > versus the validation baseline, **or** recall at the operating threshold falls
-> below **0.75**, **or** more than **30%** of monitored features have drifted. A
-> milder feature-drift level (15–30%) raises a **warning** rather than a retrain.
+> below **0.75**, **or** more than **50%** of monitored features have drifted. A
+> milder feature-drift level (25–50%) raises a **warning** rather than a retrain.
 
 Justification of the thresholds:
 
@@ -388,32 +406,44 @@ Justification of the thresholds:
   normal batch-to-batch noise.
 - **Recall floor 0.75** is a business guarantee: below it we are missing too many
   frauds regardless of other metrics. It is deliberately expressed at the
-  *operating threshold*, because a model can retain a high PR-AUC (good ranking)
-  yet still collapse at its operating point — exactly what `prod_3` shows
-  (PR-AUC would look fine on ranking alone, but recall is 0). This is why the
-  rule checks operating-point recall and not only PR-AUC.
-- **30% of features drifted** signals that the input distribution has moved
-  broadly, not just in one incidental feature.
+  *operating threshold*, because a model can retain acceptable ranking yet still
+  collapse at its operating point. This is why the rule checks operating-point
+  recall and not only PR-AUC.
+- **50% of features drifted.** This threshold is *calibrated from the data*, not
+  guessed. We measured the natural feature drift of the real dataset across its
+  stable batches (§8.3) at 38–41%, so a 30% threshold would fire on every healthy
+  batch. Setting the bar at 50% — above the observed natural background — makes
+  the rule flag only *abnormal* broad drift, while the 25% warning band still
+  surfaces the natural drift for human awareness. (On the stationary synthetic
+  dataset the natural background is near zero, so the threshold is lowered
+  accordingly in `params.yaml`.)
 
 Applied to the batches, the trigger produces `reports/trigger_log.md`:
 
 | Batch | Decision | Reason |
 |-------|----------|--------|
-| prod_1 | ✅ ok | within all thresholds |
-| prod_2 | ✅ ok | within all thresholds |
-| prod_3 | 🚨 retrain | PR-AUC drop 100% > 10%; recall 0.00 < 0.75; 31% drifted > 30% |
+| prod_1 | ⚠️ warning | 38% features drifted (warning band); performance healthy |
+| prod_2 | ⚠️ warning | 41% features drifted (warning band); performance healthy |
+| prod_3 | 🚨 retrain | PR-AUC drop 89% > 10%; recall 0.55 < 0.75; 59% drifted > 50% |
 
-This matches the briefing's expected behaviour table — normal batches do not
-trigger, and a batch with many shifted features and degraded recall does. The
-decision is written to an audit log rather than being implicit.
+This is a faithful, honest result on real data: the natural drift of the two-day
+window raises **warnings** on the healthy batches (correctly — an analyst should
+be aware of it) while only the genuinely broken batch, which also fails the
+performance checks, triggers a **retrain**. It maps directly onto the briefing's
+expected-behaviour table. The decision is written to an audit log rather than
+being implicit.
 
 ### 8.5 Risks and limitations
 
 We discuss the risks the briefing asks about honestly:
 
-- **False drift alarms.** KS is very sensitive at large sample sizes and can flag
-  trivial shifts; that is why the rule pairs it with PSI and with a warning band
-  before a hard retrain.
+- **False drift alarms and the KS pitfall.** We hit this directly: at ~28,000
+  rows per batch the Kolmogorov–Smirnov test reports *every* feature as
+  significantly drifted (p < 0.05) for even negligible differences, because
+  statistical significance grows with sample size. Using KS as a binary flag
+  would fire retrain on every batch. We therefore base the drift flag on **PSI**
+  (a magnitude measure, stable across sample sizes) and report KS for
+  information only — and we pair it with a warning band before any hard retrain.
 - **Delayed fraud labels.** In production, ground-truth fraud labels arrive days
   or weeks late (chargebacks, investigations). The performance side of the
   trigger is therefore lagged; feature and prediction drift (which need no
@@ -424,8 +454,11 @@ We discuss the risks the briefing asks about honestly:
 - **Overreacting to short-term variation** and the **operational cost of
   frequent retraining** — the thresholds and the warning band are tuned to avoid
   retraining on noise.
-- **Simulated, not real, drift.** As in §2.3, this demonstrates the mechanism on
-  two days of data, not genuine long-term fraud evolution.
+- **Injected vs natural drift.** The `prod_3` shift is a deliberate, labelled
+  injection to exercise the trigger. The 38–41% drift on the other batches is
+  *real* but comes from only two days of data (§2.3) — it is not a substitute for
+  genuine long-term fraud evolution, and the calibrated 50% threshold is specific
+  to this dataset and would be re-derived on a real production stream.
 
 ## 9. Reproducibility and deployment readiness
 
@@ -435,21 +468,24 @@ Reproducibility is treated as a first-class requirement, not an afterthought:
   pipeline was verified against.
 - **Docker** (`python:3.11-slim`) for a portable runtime; `docker build` then
   `docker run` executes the whole pipeline.
-- **Fixed seeds** across data simulation, splitting and model training.
+- **Fixed seeds** across data generation, splitting and model training.
+- **Reproducible data** — `make fetch-data` pulls the real dataset from OpenML
+  (no Kaggle account); `src/simulate_data.py` is the offline/CI fallback.
 - **DVC** stage graph (`dvc.yaml`) for data/artefact versioning and `dvc repro`.
 - **A single command** — `make pipeline` — runs the full workflow in dependency
   order and regenerates every artefact; `make test` runs the suite.
 - **Continuous integration** (GitHub Actions) installs the pinned environment,
   runs the tests, runs a data-validation smoke check, and executes the **entire
-  pipeline on synthetic data**, uploading the resulting evidence as a build
-  artefact — so every push proves the workflow still runs end-to-end.
+  pipeline** (on synthetic data, to stay fast and network-free), uploading the
+  resulting evidence as a build artefact — so every push proves the workflow
+  still runs end-to-end.
 
 **Prototype limitations.** The MLflow backend is local SQLite and artefacts are
 stored on the local filesystem; a production deployment would use a shared
 tracking server and object storage. Batch inference is file-based, not a live
-service. And, as repeatedly noted, the demonstrated numbers come from synthetic
-data. None of these change the workflow; they are the natural next steps from a
-course prototype to a production system.
+service. The dataset, though real, covers only two days (§2.3). None of these
+change the workflow; they are the natural next steps from a course prototype to a
+production system.
 
 ## 10. Conclusion
 
@@ -464,20 +500,24 @@ under CI.
 
 **Lessons learned.** First, the hardest part of MLOps is not any single tool but
 the *contracts between stages* — deciding what each stage reads and writes so the
-workflow is decoupled and testable. Second, metric choice is a design decision
-with teeth: the `prod_3` case, where ranking quality and operating-point recall
-diverge under drift, showed why the trigger must watch the metric the business
-actually operates on. Third, keeping the critical path dependency-light (native
-drift, optional Evidently) bought us reproducibility that a heavier design would
-have lost.
+workflow is decoupled and testable. Second, monitoring choices must be validated
+against real data: our first drift rule used a KS p-value, which flagged 100% of
+features on every real batch — the classic large-*n* pitfall — and the real
+dataset's ~40% natural feature drift showed that a threshold tuned on clean data
+fires constantly in the wild. Both were caught only because we ran on real data,
+and both were fixed with defensible changes (PSI-based flagging, data-calibrated
+thresholds). Third, keeping the critical path dependency-light (native drift,
+optional Evidently) bought us reproducibility that a heavier design would have
+lost.
 
-**Future work.** Replace synthetic data with the real Kaggle dataset and
-re-tune thresholds; move MLflow to a shared server and add automated model
-promotion gates; expose inference as a service with online monitoring; add
-explainability (e.g. SHAP) to support fraud-analyst review and audit; and extend
-the trigger with label-delay-aware performance estimation. The workflow is built
-to absorb these changes stage by stage — which was the whole point of
-reorganising it.
+**Future work.** Re-derive the drift threshold on a longer real production stream
+(two days is not enough to separate seasonal from genuine drift); move MLflow to
+a shared server and add automated model promotion gates; expose inference as a
+service with online monitoring; add explainability (e.g. SHAP) to support
+fraud-analyst review and audit; extend the trigger with label-delay-aware
+performance estimation; and tune the models properly (both were left near their
+defaults). The workflow is built to absorb these changes stage by stage — which
+was the whole point of reorganising it.
 
 ## 11. Acknowledgements
 

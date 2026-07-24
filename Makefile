@@ -1,8 +1,13 @@
-.PHONY: data ingest validate train threshold evaluate inference drift trigger test pipeline clean
+.PHONY: fetch-data data ingest validate train threshold evaluate inference drift trigger test pipeline clean
 
-# Generate a synthetic dataset only if the real Kaggle CSV is absent, so the
-# pipeline runs out-of-the-box in dev/CI. Drop the real creditcard.csv into
-# data/raw/ and this step is skipped.
+# Download the REAL ULB dataset from OpenML (no Kaggle account needed).
+# Run this once locally to work with real data.
+fetch-data:
+	python -m src.fetch_data
+
+# Ensure *some* dataset exists: prefer the real CSV if already present,
+# otherwise generate a synthetic one so the pipeline runs out-of-the-box in
+# dev/CI. Use `make fetch-data` for the real dataset.
 data:
 	@test -f data/raw/creditcard.csv || python -m src.simulate_data
 

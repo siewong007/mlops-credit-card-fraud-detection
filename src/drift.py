@@ -40,15 +40,18 @@ def psi(reference: np.ndarray, current: np.ndarray, bins: int = 10) -> float:
 
 
 def feature_drift(reference: pd.DataFrame, current: pd.DataFrame, params: dict) -> dict:
-    """Per-feature PSI + KS; a feature is 'drifted' if PSI exceeds threshold
-    or the KS test is significant. Returns per-feature detail + summary."""
+    """Per-feature PSI + KS. A feature is flagged 'drifted' on **PSI magnitude**
+    (PSI > threshold). The KS p-value is reported alongside for information but
+    is deliberately NOT used as the binary flag: at production batch sizes
+    (tens of thousands of rows) KS becomes significant for negligibly small
+    differences, flagging every feature. PSI is magnitude-based and stable
+    across sample sizes, so it is the robust drift signal."""
     psi_th = params["drift"]["psi_threshold"]
-    ks_th = params["drift"]["ks_pvalue"]
     detail, drifted = {}, 0
     for f in features.FEATURES:
         p = psi(reference[f].to_numpy(), current[f].to_numpy())
         ks_p = float(ks_2samp(reference[f], current[f]).pvalue)
-        is_drift = bool(p > psi_th or ks_p < ks_th)
+        is_drift = bool(p > psi_th)
         drifted += is_drift
         detail[f] = {"psi": round(p, 4), "ks_pvalue": round(ks_p, 4), "drifted": is_drift}
     return {

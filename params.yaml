@@ -33,9 +33,13 @@ threshold:
 
 drift:
   psi_threshold: 0.2          # PSI > 0.2 => feature drifted (industry rule of thumb)
-  ks_pvalue: 0.05             # KS test significance level
+  ks_pvalue: 0.05             # KS significance level — REPORTED ONLY, not the flag
+                              # (KS is over-sensitive at large n; PSI is the flag)
 
 trigger:
   pr_auc_drop_pct: 10        # retrain if PR-AUC drops >10% vs validation baseline
   recall_floor: 0.75         # retrain if recall below floor
-  drifted_features_pct: 30   # retrain if >30% of features drift
+  # Calibrated from data: the real ULB set naturally drifts ~38-41% of features
+  # (PSI>0.2) across its 2-day window, so we flag only ABNORMAL drift above that.
+  # (For the synthetic dataset, lower this to ~25 to make the drift arm fire.)
+  drifted_features_pct: 50   # retrain if >50% of features drift

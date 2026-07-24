@@ -44,11 +44,11 @@ notebook" of the kind the briefing asks us to operationalise.
 | No retraining logic                   | Justified, rule-based retraining trigger + audit log      | `src/retrain_trigger.py` |
 | Not reproducible                      | Pinned deps, Docker, DVC stages, seeds, CI, README        | repo root |
 
-## Note on data used for development
+## Note on data used
 
-The real Kaggle CSV requires an account and is not committed. For development
-and CI we generate a **synthetic** dataset with the identical schema
-(`src/simulate_data.py`, clearly labelled). All results produced from synthetic
-data are for demonstrating the *workflow*; drop the real `creditcard.csv` into
-`data/raw/` for submission-grade numbers. This is acknowledged throughout, in
-line with §18.
+Results use the **real ULB dataset** (284,807 transactions). Because the Kaggle
+source needs an account, `make fetch-data` (`src/fetch_data.py`) downloads the
+identical data from its open OpenML mirror (dataset 1597). A clearly-labelled
+**synthetic** generator (`src/simulate_data.py`) with the same schema is retained
+as the offline/CI fallback and is never presented as real data. Both flow through
+the same pipeline. This is acknowledged throughout, in line with §18.

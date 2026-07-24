@@ -1,158 +1,158 @@
 {
   "batch": "prod_3",
-  "n_rows": 8000,
-  "pct_drifted_features": 31.0,
-  "n_drifted": 9,
-  "amount_psi": 0.8863,
-  "prediction_psi": 12.4339,
-  "fraud_rate": 0.001,
-  "baseline_fraud_rate": 0.00172,
-  "pr_auc": 0.0007384034411315314,
-  "recall": 0.0,
-  "precision": 0.0,
+  "n_rows": 28481,
+  "pct_drifted_features": 58.6,
+  "n_drifted": 17,
+  "amount_psi": 0.2758,
+  "prediction_psi": 2.7778,
+  "fraud_rate": 0.00077,
+  "baseline_fraud_rate": 0.00189,
+  "pr_auc": 0.08812109445034835,
+  "recall": 0.5454545454545454,
+  "precision": 0.08,
   "per_feature": {
     "V1": {
-      "psi": 0.002,
-      "ks_pvalue": 0.3335,
-      "drifted": false
+      "psi": 1.5877,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V2": {
-      "psi": 0.0007,
-      "ks_pvalue": 0.771,
+      "psi": 0.0398,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V3": {
-      "psi": 0.0024,
-      "ks_pvalue": 0.1223,
-      "drifted": false
+      "psi": 1.5151,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V4": {
-      "psi": 5.1741,
+      "psi": 2.8102,
       "ks_pvalue": 0.0,
       "drifted": true
     },
     "V5": {
-      "psi": 0.002,
-      "ks_pvalue": 0.0566,
-      "drifted": false
+      "psi": 0.3722,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V6": {
-      "psi": 0.0021,
-      "ks_pvalue": 0.0548,
+      "psi": 0.113,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V7": {
-      "psi": 0.0012,
-      "ks_pvalue": 0.7178,
+      "psi": 0.1643,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V8": {
-      "psi": 0.0018,
-      "ks_pvalue": 0.0396,
-      "drifted": true
+      "psi": 0.1013,
+      "ks_pvalue": 0.0,
+      "drifted": false
     },
     "V9": {
-      "psi": 0.0005,
-      "ks_pvalue": 0.5372,
+      "psi": 0.0615,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V10": {
-      "psi": 5.2625,
+      "psi": 5.7614,
       "ks_pvalue": 0.0,
       "drifted": true
     },
     "V11": {
-      "psi": 4.7806,
+      "psi": 4.012,
       "ks_pvalue": 0.0,
       "drifted": true
     },
     "V12": {
-      "psi": 4.5854,
+      "psi": 7.025,
       "ks_pvalue": 0.0,
       "drifted": true
     },
     "V13": {
-      "psi": 0.0021,
-      "ks_pvalue": 0.0349,
-      "drifted": true
+      "psi": 0.0257,
+      "ks_pvalue": 0.0,
+      "drifted": false
     },
     "V14": {
-      "psi": 4.9704,
+      "psi": 4.5883,
       "ks_pvalue": 0.0,
       "drifted": true
     },
     "V15": {
-      "psi": 0.0011,
-      "ks_pvalue": 0.2305,
-      "drifted": false
+      "psi": 0.3786,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V16": {
-      "psi": 0.0009,
-      "ks_pvalue": 0.9811,
+      "psi": 0.0149,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V17": {
-      "psi": 4.7851,
+      "psi": 9.2839,
       "ks_pvalue": 0.0,
       "drifted": true
     },
     "V18": {
-      "psi": 0.0006,
-      "ks_pvalue": 0.5605,
+      "psi": 0.0632,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V19": {
-      "psi": 0.0013,
-      "ks_pvalue": 0.7774,
+      "psi": 0.0475,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V20": {
-      "psi": 0.0008,
-      "ks_pvalue": 0.9652,
+      "psi": 0.0961,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V21": {
-      "psi": 0.0014,
-      "ks_pvalue": 0.5014,
+      "psi": 0.18,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V22": {
-      "psi": 0.0007,
-      "ks_pvalue": 0.7076,
-      "drifted": false
+      "psi": 0.3306,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V23": {
-      "psi": 0.0012,
-      "ks_pvalue": 0.9408,
-      "drifted": false
+      "psi": 0.2547,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V24": {
-      "psi": 0.0012,
-      "ks_pvalue": 0.5605,
-      "drifted": false
+      "psi": 0.2248,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V25": {
-      "psi": 0.0004,
-      "ks_pvalue": 0.6012,
-      "drifted": false
+      "psi": 0.5237,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V26": {
-      "psi": 0.0005,
-      "ks_pvalue": 0.5175,
-      "drifted": false
+      "psi": 0.2608,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "V27": {
-      "psi": 0.0007,
-      "ks_pvalue": 0.9493,
+      "psi": 0.0881,
+      "ks_pvalue": 0.0,
       "drifted": false
     },
     "V28": {
-      "psi": 0.0008,
-      "ks_pvalue": 0.8151,
-      "drifted": false
+      "psi": 1.0099,
+      "ks_pvalue": 0.0,
+      "drifted": true
     },
     "Amount": {
-      "psi": 0.8863,
+      "psi": 0.2758,
       "ks_pvalue": 0.0,
       "drifted": true
     }

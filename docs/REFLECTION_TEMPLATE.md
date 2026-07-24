@@ -51,9 +51,10 @@ Recommended length: 500–800 words. Recommended structure: three parts —
 ---
 
 *Illustrative fragment (do not copy — write your own):* "I owned the monitoring
-stage. I implemented `src/drift.py`, choosing to compute PSI and the KS test
-natively so the retraining trigger wouldn't depend on Evidently's API. The
-hardest part was understanding why `prod_3` showed a high PR-AUC but zero recall;
-working through it taught me the difference between a ranking metric and an
-operating-point metric, which is why we based the recall part of the trigger on
-the chosen threshold…"
+stage. I implemented `src/drift.py`, computing PSI and the KS test natively so
+the trigger wouldn't depend on Evidently's API. The hardest part came when we ran
+on the real data: the KS test flagged 100% of features as drifted on every batch.
+Working out why — that statistical significance grows with sample size, so at
+28k rows KS fires on trivial differences — taught me to base the drift flag on
+PSI's magnitude instead, and to calibrate the threshold against the dataset's
+~40% natural drift rather than a textbook default…"

@@ -1,11 +1,11 @@
 # Retraining trigger log
 
-Promoted model: **logistic_regression** | validation baseline PR-AUC: **0.9678**
+Promoted model: **logistic_regression** | validation baseline PR-AUC: **0.8181**
 
-Rule: retrain if PR-AUC drop > 10% OR recall < 0.75 OR >30% features drifted.
+Rule: retrain if PR-AUC drop > 10% OR recall < 0.75 OR >50% features drifted.
 
 | Batch | PR-AUC | recall | % drifted | decision | reason |
 |-------|--------|--------|-----------|----------|--------|
-| prod_1 | 0.995 | 0.950 | 7% | ✅ ok | within all thresholds |
-| prod_2 | 0.942 | 0.867 | 3% | ✅ ok | within all thresholds |
-| prod_3 | 0.001 | 0.000 | 31% | 🚨 retrain | PR-AUC drop 100% > 10%; recall 0.00 < floor 0.75; 31% features drifted > 30% |
+| prod_1 | 0.810 | 0.818 | 38% | ⚠️ warning | 38% features drifted (warning band) |
+| prod_2 | 0.835 | 0.849 | 41% | ⚠️ warning | 41% features drifted (warning band) |
+| prod_3 | 0.088 | 0.545 | 59% | 🚨 retrain | PR-AUC drop 89% > 10%; recall 0.55 < floor 0.75; 59% features drifted > 50% |
