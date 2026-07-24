@@ -466,8 +466,11 @@ Reproducibility is treated as a first-class requirement, not an afterthought:
 
 - **Pinned dependencies** in `requirements.txt`, matching the versions the
   pipeline was verified against.
-- **Docker** (`python:3.11-slim`) for a portable runtime; `docker build` then
-  `docker run` executes the whole pipeline.
+- **Docker** (`python:3.13-slim`) for a portable runtime; `docker build` then
+  `docker run` executes the whole pipeline. (Python 3.13 is required because
+  `xgboost` 3.3 publishes no wheels for 3.11 — a pin we corrected after the
+  container build failed, which is exactly the kind of environment drift a
+  containerised, CI-verified setup is meant to catch.)
 - **Fixed seeds** across data generation, splitting and model training.
 - **Reproducible data** — `make fetch-data` pulls the real dataset from OpenML
   (no Kaggle account); `src/simulate_data.py` is the offline/CI fallback.
@@ -480,12 +483,31 @@ Reproducibility is treated as a first-class requirement, not an afterthought:
   resulting evidence as a build artefact — so every push proves the workflow
   still runs end-to-end.
 
+### 9.1 Scheduled monitoring and a published dashboard
+
+Because the system is a **batch** pipeline, we simulate operation with a
+scheduled job rather than a hosted prediction API — a closer analogue of how such
+a model actually runs in a bank. `.github/workflows/monitoring.yml` executes
+weekly (and on demand): it fetches the real dataset, runs the pipeline, evaluates
+the retraining trigger, writes the decision table into the workflow run summary,
+raises a **warning annotation** when a batch meets the retrain criteria, archives
+the evidence, and redeploys a static monitoring dashboard to GitHub Pages.
+
+The dashboard (`src/build_dashboard.py`) renders the same JSON contract the
+trigger consumes — promoted model, operating point, per-batch drift and decisions,
+and the Evidently reports — into a page a non-engineer can read. It always states
+its **data provenance** (a lineage record written by whichever data source ran),
+so synthetic figures can never be presented as real results. This closes the loop
+from "the pipeline produces evidence" to "the evidence is continuously published
+and someone is alerted", which is what monitoring means operationally.
+
 **Prototype limitations.** The MLflow backend is local SQLite and artefacts are
 stored on the local filesystem; a production deployment would use a shared
-tracking server and object storage. Batch inference is file-based, not a live
-service. The dataset, though real, covers only two days (§2.3). None of these
-change the workflow; they are the natural next steps from a course prototype to a
-production system.
+tracking server and object storage. Inference is file-based and scheduled, not a
+low-latency service, and the alert is a workflow annotation rather than a pager.
+The dataset, though real, covers only two days (§2.3). None of these change the
+workflow; they are the natural next steps from a course prototype to a production
+system.
 
 ## 10. Conclusion
 

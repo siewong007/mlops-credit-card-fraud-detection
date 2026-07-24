@@ -19,8 +19,9 @@ make fetch-data && make pipeline
 | 5:00–6:00 | C | **Validation & threshold** | Show the Pandera schema and a deliberately broken row failing. Show `reports/figures/threshold_tradeoff.png`; explain the FN≫FP cost choice → threshold 0.98, which lifts precision from 0.04 (unusable, 2,300 false alarms at 0.5) to 0.41. |
 | 6:00–7:30 | C | **Monitoring & drift** | Show `reports/figures/psi_prod_3.png` and open an Evidently HTML report from `reports/drift/`. Make the key point: real data *naturally* drifts ~40% of features, so we flag on **PSI** not the KS p-value (which over-fires at 28k rows). |
 | 7:30–8:30 | D | **Retraining trigger** | Show `reports/trigger_log.md`: prod_1/2 → **warning** (natural drift, healthy performance), prod_3 → **retrain** (all three reasons). Explain the rule and why the 50% drift threshold is calibrated to the data's natural background. |
-| 8:30–9:30 | D | **Reproducibility** | Show pinned `requirements.txt`, `Dockerfile`, `dvc.yaml`, and the green **CI run** executing the whole pipeline on every push. `make clean && make pipeline` reproduces everything. |
-| 9:30–10:00 | all | **Wrap-up** | One sentence each: which requirement your stage satisfied. Close on "the graded change is the reorganisation, and every stage traces to a requirement." |
+| 8:30–9:15 | D | **Reproducibility** | Show pinned `requirements.txt`, `Dockerfile`, `dvc.yaml`, and the green **CI run** executing the whole pipeline on every push. `make clean && make pipeline` reproduces everything. |
+| 9:15–9:45 | D | **Automated monitoring (live)** | Open the published dashboard: https://siewong007.github.io/mlops-credit-card-fraud-detection/ — rebuilt by a **scheduled** weekly job that re-scores batches, re-evaluates the trigger, and annotates the run when retraining is due. Strongest closing beat: the evidence publishes itself. |
+| 9:45–10:00 | all | **Wrap-up** | One sentence each: which requirement your stage satisfied. Close on "the graded change is the reorganisation, and every stage traces to a requirement." |
 
 ## Backup / FAQ answers
 

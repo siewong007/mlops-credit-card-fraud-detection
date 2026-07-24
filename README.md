@@ -43,8 +43,9 @@ pip install -r requirements.txt
 make fetch-data   # download the real ULB dataset from OpenML (run once)
 make pipeline     # full workflow: (data) → ingest → validate → train →
                   # threshold → evaluate → inference → drift → trigger
+make dashboard    # render the monitoring dashboard into site/
 make test         # unit tests (pytest)
-make clean        # remove generated artefacts (models/, reports/, batches)
+make clean        # remove generated artefacts (models/, reports/, batches, site/)
 ```
 
 Inspect the tracked experiments and the registered model:
@@ -64,6 +65,26 @@ Or run the whole thing in a pinned container:
 ```bash
 docker build -t fraud-mlops . && docker run --rm fraud-mlops
 ```
+
+## Automated monitoring (scheduled) & live dashboard
+
+**Dashboard:** https://siewong007.github.io/mlops-credit-card-fraud-detection/
+
+Because this is a *batch* system, "production" is simulated with a scheduled job
+rather than a hosted API. [`.github/workflows/monitoring.yml`](.github/workflows/monitoring.yml)
+runs every Monday (and on demand via *Actions → Scheduled monitoring → Run
+workflow*):
+
+1. fetches the real ULB dataset from OpenML — falling back to the synthetic
+   generator if OpenML is unreachable,
+2. runs the full pipeline (score batches → drift → retraining trigger),
+3. publishes the trigger table to the run summary and raises a workflow
+   **warning annotation** if any batch meets the retrain criteria,
+4. uploads the evidence as a build artefact, and
+5. rebuilds and deploys the dashboard to GitHub Pages.
+
+The dashboard always states its **data provenance**, so synthetic results can
+never be mistaken for real ones. Build it locally with `make dashboard`.
 
 ## What you get (evidence)
 

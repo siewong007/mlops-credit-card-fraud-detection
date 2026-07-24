@@ -13,7 +13,7 @@ import urllib.request
 
 import pandas as pd
 
-from src.config import ROOT, load_params
+from src.config import ROOT, load_params, write_provenance
 
 PARQUET_URL = "https://data.openml.org/datasets/0000/1597/dataset_1597.pq"
 COLS = ["Time"] + [f"V{i}" for i in range(1, 29)] + ["Amount", "Class"]
@@ -31,10 +31,15 @@ def fetch() -> pd.DataFrame:
 
 
 def main() -> None:
-    out = ROOT / load_params()["data"]["raw_path"]
+    params = load_params()
+    out = ROOT / params["data"]["raw_path"]
     out.parent.mkdir(parents=True, exist_ok=True)
     df = fetch()
     df.to_csv(out, index=False)
+    write_provenance(
+        params, "REAL — ULB creditcard via OpenML dataset 1597",
+        len(df), int(df["Class"].sum()),
+    )
     print(
         f"[REAL] wrote {out} — {len(df):,} rows, {int(df['Class'].sum())} fraud "
         f"({df['Class'].mean():.6f}). Source: OpenML dataset 1597 (ULB creditcard)."

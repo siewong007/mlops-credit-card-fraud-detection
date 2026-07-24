@@ -1,4 +1,4 @@
-.PHONY: fetch-data data ingest validate train threshold evaluate inference drift trigger test pipeline clean
+.PHONY: fetch-data data ingest validate train threshold evaluate inference drift trigger dashboard test pipeline clean
 
 # Download the REAL ULB dataset from OpenML (no Kaggle account needed).
 # Run this once locally to work with real data.
@@ -27,6 +27,8 @@ drift:
 	python -m src.drift
 trigger:
 	python -m src.retrain_trigger
+dashboard:
+	python -m src.build_dashboard
 test:
 	python -m pytest
 
@@ -34,5 +36,5 @@ test:
 pipeline: ingest validate train threshold evaluate inference drift trigger
 
 clean:
-	rm -rf models reports/drift reports/*.json reports/trigger_log.md \
+	rm -rf models site reports/drift reports/*.json reports/trigger_log.md \
 	       reports/figures/*.png data/batches/*.csv data/batches/preds_*.csv mlruns

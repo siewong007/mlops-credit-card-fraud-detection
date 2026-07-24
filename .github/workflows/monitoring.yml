@@ -1,0 +1,93 @@
+name: Scheduled monitoring
+
+# The pipeline is a *batch* system, so a scheduled run is a far more faithful
+# simulation of production than a hosted API would be: new batches are scored,
+# drift and performance are recomputed, the retraining trigger is evaluated, and
+# the resulting evidence is published as a dashboard.
+on:
+  schedule:
+    - cron: "0 6 * * 1"      # every Monday 06:00 UTC
+  workflow_dispatch:          # manual run (used for the live demo)
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    env:
+      MPLBACKEND: Agg
+      DISABLE_PANDERA_IMPORT_WARNING: "True"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      # Prefer the real ULB dataset. If OpenML is unreachable the pipeline falls
+      # back to the synthetic generator (`make data`), and the dashboard states
+      # which dataset produced the figures — it never mislabels synthetic as real.
+      - name: Fetch real dataset (OpenML)
+        id: fetch
+        continue-on-error: true
+        run: python -m src.fetch_data
+
+      - name: Run pipeline (ingest -> ... -> retraining trigger)
+        run: make pipeline
+
+      - name: Build monitoring dashboard
+        run: make dashboard
+
+      - name: Publish decision to run summary
+        run: |
+          {
+            echo "## Monitoring run"
+            echo
+            if [ "${{ steps.fetch.outcome }}" = "success" ]; then
+              echo "Dataset: **real ULB (OpenML 1597)**"
+            else
+              echo "Dataset: **synthetic fallback** (OpenML fetch failed)"
+            fi
+            echo
+            cat reports/trigger_log.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Flag retraining decision
+        run: |
+          if grep -qi 'retrain' reports/trigger_log.md; then
+            echo "::warning title=Retraining trigger fired::At least one batch met the retrain criteria — see the run summary and dashboard."
+          fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-evidence
+          path: |
+            reports/metrics_valid.json
+            reports/drift_summary.json
+            reports/trigger_log.md
+            reports/figures/**
+            reports/drift/**
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: monitor
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

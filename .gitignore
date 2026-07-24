@@ -13,3 +13,7 @@ reports/drift/*.html
 
 # macOS
 .DS_Store
+
+# Generated static dashboard (published to GitHub Pages by CI)
+site/
+data/raw/PROVENANCE.json
