@@ -1,0 +1,67 @@
+"""Synthetic dataset generator — DEVELOPMENT / CI ONLY.
+
+The real Kaggle ULB ``creditcard.csv`` (mlg-ulb/creditcardfraud) requires a
+Kaggle account to download and is ~150 MB, so it is neither committed nor
+available in CI. This module fabricates a dataset with the *exact same schema*
+(Time, V1..V28, Amount, Class) and a realistic ~0.17% fraud rate, so the whole
+MLOps pipeline can run end-to-end and produce evidence without the real file.
+
+It is NOT a modelling contribution and must never be presented as real data:
+drop the genuine Kaggle CSV into ``data/raw/creditcard.csv`` and every stage
+downstream is identical. The fraud class carries a learnable signal (a few PCA
+components are mean-shifted, mirroring how V14/V4/V10/V12/V17 separate fraud in
+the real data) so evaluation metrics are meaningful rather than noise.
+"""
+import numpy as np
+import pandas as pd
+
+from src.config import ROOT, load_params
+
+# PCA components that carry the fraud signal (named after the influential
+# features in the real dataset; here they are simply mean-shifted for fraud).
+_SIGNAL_COMPONENTS = [4, 10, 11, 12, 14, 17]
+_TWO_DAYS_SECONDS = 172_792  # span of the real 2-day dataset
+
+
+def generate(n_rows: int, fraud_rate: float, random_state: int) -> pd.DataFrame:
+    rng = np.random.default_rng(random_state)
+    n_fraud = max(2, int(round(n_rows * fraud_rate)))
+    y = np.zeros(n_rows, dtype=int)
+    y[rng.choice(n_rows, size=n_fraud, replace=False)] = 1
+
+    # V1..V28 ~ standard normal (PCA outputs); shift signal components for fraud.
+    V = rng.standard_normal((n_rows, 28))
+    for c in _SIGNAL_COMPONENTS:
+        V[y == 1, c - 1] += rng.normal(-2.2, 0.6, size=n_fraud)
+
+    # Amount: right-skewed; fraud skews to slightly larger amounts.
+    amount = rng.exponential(scale=88.0, size=n_rows)
+    amount[y == 1] *= rng.uniform(1.2, 2.5, size=n_fraud)
+    amount = np.round(np.clip(amount, 0, 25_691), 2)
+
+    # Time: monotonically increasing over a 2-day window (enables time batching).
+    time = np.sort(rng.uniform(0, _TWO_DAYS_SECONDS, size=n_rows)).round(0)
+
+    df = pd.DataFrame(V, columns=[f"V{i}" for i in range(1, 29)])
+    df.insert(0, "Time", time)
+    df["Amount"] = amount
+    df["Class"] = y
+    return df
+
+
+def main() -> None:
+    params = load_params()
+    s = params["simulate"]
+    df = generate(s["n_rows"], s["fraud_rate"], s["random_state"])
+    out = ROOT / params["data"]["raw_path"]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out, index=False)
+    print(
+        f"[SYNTHETIC] wrote {out} — {len(df):,} rows, "
+        f"{int(df['Class'].sum())} fraud ({df['Class'].mean():.5f}). "
+        "Replace with the real Kaggle CSV for submission-grade results."
+    )
+
+
+if __name__ == "__main__":
+    main()

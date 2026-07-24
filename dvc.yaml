@@ -1,7 +1,81 @@
-# TODO(A): flesh out after `dvc init` and `dvc add data/raw/creditcard.csv`
+# DVC pipeline — the same reorganised workflow as the Makefile, but with
+# dependency tracking and one-command reproduction: `dvc repro`.
+#
+# Setup once:  dvc init  &&  dvc add data/raw/creditcard.csv
+# (For dev without the real dataset, `make data` writes a synthetic CSV first.)
+#
+# Model artefacts are dvc-cached (binary, gitignored); human-readable evidence
+# uses `cache: false` so it stays versioned in git alongside the code.
 stages:
   ingest:
     cmd: python -m src.ingest
-    deps: [src/ingest.py, data/raw/creditcard.csv]
+    deps: [src/ingest.py, src/config.py, data/raw/creditcard.csv]
     params: [data]
-    outs: [data/batches]
+    outs:
+      - data/batches/train.csv
+      - data/batches/valid.csv
+      - data/batches/prod_1.csv
+      - data/batches/prod_2.csv
+      - data/batches/prod_3.csv
+
+  validate:
+    cmd: python -m src.validate
+    deps: [src/validate.py, data/raw/creditcard.csv]
+
+  train:
+    cmd: python -m src.train
+    deps: [src/train.py, src/features.py, src/evaluate.py,
+           data/batches/train.csv, data/batches/valid.csv]
+    params: [train]
+    outs: [models/model.joblib, models/scaler.joblib, models/baseline.json]
+
+  threshold:
+    cmd: python -m src.threshold
+    deps: [src/threshold.py, models/model.joblib, models/scaler.joblib,
+           data/batches/valid.csv]
+    params: [threshold]
+    outs:
+      - models/threshold.json
+      - reports/figures/threshold_tradeoff.png:
+          cache: false
+
+  evaluate:
+    cmd: python -m src.evaluate
+    deps: [src/evaluate.py, models/model.joblib, models/scaler.joblib,
+           data/batches/valid.csv]
+    outs:
+      - reports/figures/confusion_matrix.png:
+          cache: false
+      - reports/figures/pr_curve.png:
+          cache: false
+    metrics:
+      - reports/metrics_valid.json:
+          cache: false
+
+  inference:
+    cmd: python -m src.batch_inference
+    deps: [src/batch_inference.py, models/model.joblib, models/threshold.json,
+           data/batches/prod_1.csv, data/batches/prod_2.csv, data/batches/prod_3.csv]
+    outs:
+      - data/batches/preds_prod_1.csv
+      - data/batches/preds_prod_2.csv
+      - data/batches/preds_prod_3.csv
+
+  drift:
+    cmd: python -m src.drift
+    deps: [src/drift.py, models/model.joblib, models/scaler.joblib,
+           data/batches/train.csv, data/batches/valid.csv,
+           data/batches/preds_prod_1.csv, data/batches/preds_prod_2.csv,
+           data/batches/preds_prod_3.csv]
+    params: [drift]
+    metrics:
+      - reports/drift_summary.json:
+          cache: false
+
+  trigger:
+    cmd: python -m src.retrain_trigger
+    deps: [src/retrain_trigger.py, reports/drift_summary.json, models/baseline.json]
+    params: [trigger]
+    outs:
+      - reports/trigger_log.md:
+          cache: false

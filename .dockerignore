@@ -1,15 +1,13 @@
+.venv/
+.git/
 __pycache__/
 *.pyc
-.venv/
+.pytest_cache/
 mlruns/
 mlartifacts/
 mlflow.db
 models/
 data/raw/*.csv
 data/batches/*.csv
-reports/*.html
 reports/drift/*.html
-.dvc/cache
-
-# macOS
 .DS_Store

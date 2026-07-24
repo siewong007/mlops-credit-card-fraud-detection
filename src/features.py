@@ -1,13 +1,18 @@
 """Feature processing (Owner: B).
 
-Keep minimal: scale Amount (and optionally Time-derived features).
-Fit scaler on train only to avoid leakage.
+Keep minimal: scale Amount (fit on train only to avoid leakage). The fitted
+scaler is persisted alongside the model so batch inference applies the exact
+same transform as training.
 """
-from sklearn.preprocessing import StandardScaler
+import joblib
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
+
+from src.config import MODELS_DIR
 
 FEATURES = [f"V{i}" for i in range(1, 29)] + ["Amount"]
 TARGET = "Class"
+_SCALER_PATH = MODELS_DIR / "scaler.joblib"
 
 
 def fit_scaler(train: pd.DataFrame) -> StandardScaler:
@@ -22,3 +27,12 @@ def transform(df: pd.DataFrame, scaler: StandardScaler) -> pd.DataFrame:
 
 def xy(df: pd.DataFrame):
     return df[FEATURES], df[TARGET]
+
+
+def save_scaler(scaler: StandardScaler) -> None:
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scaler, _SCALER_PATH)
+
+
+def load_scaler() -> StandardScaler:
+    return joblib.load(_SCALER_PATH)

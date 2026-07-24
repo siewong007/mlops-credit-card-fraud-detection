@@ -1,0 +1,160 @@
+{
+  "batch": "prod_3",
+  "n_rows": 8000,
+  "pct_drifted_features": 31.0,
+  "n_drifted": 9,
+  "amount_psi": 0.8863,
+  "prediction_psi": 12.4339,
+  "fraud_rate": 0.001,
+  "baseline_fraud_rate": 0.00172,
+  "pr_auc": 0.0007384034411315314,
+  "recall": 0.0,
+  "precision": 0.0,
+  "per_feature": {
+    "V1": {
+      "psi": 0.002,
+      "ks_pvalue": 0.3335,
+      "drifted": false
+    },
+    "V2": {
+      "psi": 0.0007,
+      "ks_pvalue": 0.771,
+      "drifted": false
+    },
+    "V3": {
+      "psi": 0.0024,
+      "ks_pvalue": 0.1223,
+      "drifted": false
+    },
+    "V4": {
+      "psi": 5.1741,
+      "ks_pvalue": 0.0,
+      "drifted": true
+    },
+    "V5": {
+      "psi": 0.002,
+      "ks_pvalue": 0.0566,
+      "drifted": false
+    },
+    "V6": {
+      "psi": 0.0021,
+      "ks_pvalue": 0.0548,
+      "drifted": false
+    },
+    "V7": {
+      "psi": 0.0012,
+      "ks_pvalue": 0.7178,
+      "drifted": false
+    },
+    "V8": {
+      "psi": 0.0018,
+      "ks_pvalue": 0.0396,
+      "drifted": true
+    },
+    "V9": {
+      "psi": 0.0005,
+      "ks_pvalue": 0.5372,
+      "drifted": false
+    },
+    "V10": {
+      "psi": 5.2625,
+      "ks_pvalue": 0.0,
+      "drifted": true
+    },
+    "V11": {
+      "psi": 4.7806,
+      "ks_pvalue": 0.0,
+      "drifted": true
+    },
+    "V12": {
+      "psi": 4.5854,
+      "ks_pvalue": 0.0,
+      "drifted": true
+    },
+    "V13": {
+      "psi": 0.0021,
+      "ks_pvalue": 0.0349,
+      "drifted": true
+    },
+    "V14": {
+      "psi": 4.9704,
+      "ks_pvalue": 0.0,
+      "drifted": true
+    },
+    "V15": {
+      "psi": 0.0011,
+      "ks_pvalue": 0.2305,
+      "drifted": false
+    },
+    "V16": {
+      "psi": 0.0009,
+      "ks_pvalue": 0.9811,
+      "drifted": false
+    },
+    "V17": {
+      "psi": 4.7851,
+      "ks_pvalue": 0.0,
+      "drifted": true
+    },
+    "V18": {
+      "psi": 0.0006,
+      "ks_pvalue": 0.5605,
+      "drifted": false
+    },
+    "V19": {
+      "psi": 0.0013,
+      "ks_pvalue": 0.7774,
+      "drifted": false
+    },
+    "V20": {
+      "psi": 0.0008,
+      "ks_pvalue": 0.9652,
+      "drifted": false
+    },
+    "V21": {
+      "psi": 0.0014,
+      "ks_pvalue": 0.5014,
+      "drifted": false
+    },
+    "V22": {
+      "psi": 0.0007,
+      "ks_pvalue": 0.7076,
+      "drifted": false
+    },
+    "V23": {
+      "psi": 0.0012,
+      "ks_pvalue": 0.9408,
+      "drifted": false
+    },
+    "V24": {
+      "psi": 0.0012,
+      "ks_pvalue": 0.5605,
+      "drifted": false
+    },
+    "V25": {
+      "psi": 0.0004,
+      "ks_pvalue": 0.6012,
+      "drifted": false
+    },
+    "V26": {
+      "psi": 0.0005,
+      "ks_pvalue": 0.5175,
+      "drifted": false
+    },
+    "V27": {
+      "psi": 0.0007,
+      "ks_pvalue": 0.9493,
+      "drifted": false
+    },
+    "V28": {
+      "psi": 0.0008,
+      "ks_pvalue": 0.8151,
+      "drifted": false
+    },
+    "Amount": {
+      "psi": 0.8863,
+      "ks_pvalue": 0.0,
+      "drifted": true
+    }
+  }
+}

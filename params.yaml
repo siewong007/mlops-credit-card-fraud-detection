@@ -5,14 +5,36 @@ data:
   train_frac: 0.5
   valid_frac: 0.2
   n_prod_batches: 3
+  # Inject a shifted production batch to demonstrate the drift + retraining
+  # trigger firing (clearly labelled simulation; briefing SS10/SS13 allow this).
+  inject_drift: true
+  drift_batch: prod_3
+  drift_amount_scale: 3.0      # multiply Amount to force feature/amount drift
+  drift_feature_shift: 2.5     # shift signal components to force performance drift
+
+# Synthetic dataset generator (dev/CI only). Ignored once the real Kaggle
+# creditcard.csv is placed in data/raw/. See src/simulate_data.py.
+simulate:
+  n_rows: 80000
+  fraud_rate: 0.0018
+  random_state: 42
+
 train:
-  model: logistic_regression   # or: xgboost
+  # Minimum two experiment runs (briefing SS9.2): a linear baseline and a
+  # gradient-boosted improvement. Best PR-AUC on valid is promoted.
+  models: [logistic_regression, xgboost]
   class_weight: balanced
   random_state: 42
+
 threshold:
   # business costs used for cost-based threshold selection
   cost_false_negative: 100
   cost_false_positive: 1
+
+drift:
+  psi_threshold: 0.2          # PSI > 0.2 => feature drifted (industry rule of thumb)
+  ks_pvalue: 0.05             # KS test significance level
+
 trigger:
   pr_auc_drop_pct: 10        # retrain if PR-AUC drops >10% vs validation baseline
   recall_floor: 0.75         # retrain if recall below floor

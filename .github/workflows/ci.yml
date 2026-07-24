@@ -1,13 +1,39 @@
 name: CI
 on: [push, pull_request]
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      MPLBACKEND: Agg
+      DISABLE_PANDERA_IMPORT_WARNING: "True"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with:
+          python-version: "3.11"
+          cache: pip
       - run: pip install -r requirements.txt
-      - run: pytest -q
-      # TODO(D): add a small sample CSV so validation can run in CI
-      # - run: python -m src.validate --path tests/fixtures/sample.csv
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: Data validation smoke (synthetic dataset)
+        run: |
+          python -m src.simulate_data
+          python -m src.validate
+
+      - name: Full reorganised pipeline on synthetic data
+        run: make pipeline
+
+      - name: Upload testing & monitoring evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-evidence
+          path: |
+            reports/metrics_valid.json
+            reports/drift_summary.json
+            reports/trigger_log.md
+            reports/figures/**
+            reports/drift/**

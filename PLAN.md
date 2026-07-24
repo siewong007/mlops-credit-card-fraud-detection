@@ -88,13 +88,13 @@ section ownership: A→§2–3, B→§6–7, C→§8, D→§5+§9; intro/conclus
 
 ## 8. Deliverables checklist
 
-- [ ] Repo: source, README, dependency file, reproducibility instructions
-- [ ] Technical report 4,000–5,000 words (structure §15 of briefing)
-- [ ] Before/after workflow diagrams
-- [ ] Evidence: validation output, evaluation results, drift reports, trigger logic
-- [ ] 8–10 min presentation/demo
-- [ ] Individual reflections, 500–800 words each
-- [ ] Baseline notebook acknowledged + modifications explained (academic integrity)
+- [x] Repo: source, README, dependency file, reproducibility instructions
+- [x] Technical report 4,000–5,000 words — [docs/TECHNICAL_REPORT.md](docs/TECHNICAL_REPORT.md)
+- [x] Before/after workflow diagrams — [docs/workflow_diagrams.md](docs/workflow_diagrams.md)
+- [x] Evidence: validation, evaluation, drift reports, trigger log — `reports/` (run `make pipeline`)
+- [x] 8–10 min presentation/demo — [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
+- [~] Individual reflections, 500–800 words each — template in [docs/REFLECTION_TEMPLATE.md](docs/REFLECTION_TEMPLATE.md) (**each student writes their own**, per §18)
+- [x] Baseline notebook acknowledged + modifications explained — [notebooks/README.md](notebooks/README.md)
 
 ## 9. Rubric alignment
 
