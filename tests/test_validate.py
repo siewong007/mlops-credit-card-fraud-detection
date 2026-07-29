@@ -86,10 +86,49 @@ def test_validate_file_writes_failed_evidence_before_raising(tmp_path):
     assert "NaN" not in report_path.read_text()
 
 
+def test_validate_file_reports_unsplittable_raw_schema_before_raising(tmp_path):
+    raw_path = tmp_path / "raw.csv"
+    report_path = tmp_path / "validation_report.json"
+    _frame().drop(columns=["Time"]).to_csv(raw_path, index=False)
+    params = {
+        "data": {
+            "train_frac": 0.5,
+            "model_valid_frac": 0.1,
+            "calibration_frac": 0.1,
+            "n_prod_batches": 3,
+        }
+    }
+
+    with pytest.raises(DataValidationError):
+        validate_file(raw_path, params, report_path)
+
+    report = json.loads(report_path.read_text())
+    assert report["overall_status"] == "failed"
+    assert report["datasets"]["raw"]["status"] == "failed"
+    for name in ("train", "model_valid", "calibration"):
+        assert report["datasets"][name]["status"] == "failed"
+        assert report["datasets"][name]["checks"][0]["name"] == "slice_unavailable"
+
+
 def test_validation_gate_rejects_missing_failed_or_incomplete_report(tmp_path):
     path = tmp_path / "validation_report.json"
     with pytest.raises(DataValidationError):
         require_validation_gate(path)
+
+
+def test_validation_gate_rejects_empty_or_failed_dataset_evidence(tmp_path):
+    path = tmp_path / "validation_report.json"
+    required = ("raw", "train", "model_valid", "calibration")
+    for datasets in (
+        {name: {} for name in required},
+        {
+            name: {"status": "failed" if name == "calibration" else "passed"}
+            for name in required
+        },
+    ):
+        path.write_text(json.dumps({"overall_status": "passed", "datasets": datasets}))
+        with pytest.raises(DataValidationError):
+            require_validation_gate(path)
     path.write_text(json.dumps({"overall_status": "failed", "datasets": {}}))
     with pytest.raises(DataValidationError):
         require_validation_gate(path)

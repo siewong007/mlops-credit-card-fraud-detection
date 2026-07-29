@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
@@ -63,6 +64,21 @@ def _is_non_negative_time_and_amount(df: pd.DataFrame) -> bool:
         return False
     values = df[["Time", "Amount"]].apply(pd.to_numeric, errors="coerce")
     return bool((values >= 0).all().all())
+
+
+def _unavailable_slice_report(details: str) -> dict:
+    return {
+        "contract": "labeled",
+        "status": "failed",
+        "row_count": None,
+        "columns": [],
+        "dtypes": {},
+        "null_counts": {},
+        "ranges": {},
+        "fraud_count": None,
+        "fraud_rate": None,
+        "checks": [_check("slice_unavailable", False, details)],
+    }
 
 
 def check_dataframe(
@@ -165,16 +181,22 @@ def validate_file(
     from src.ingest import split_by_time
 
     raw = pd.read_csv(path)
-    slices = split_by_time(raw, params)
     datasets = {
         "raw": check_dataframe(
             raw, contract="labeled", require_target_distribution=True
         )
     }
-    for name in DEVELOPMENT_SLICES:
-        datasets[name] = check_dataframe(
-            slices[name], contract="labeled", require_target_distribution=True
-        )
+    try:
+        slices = split_by_time(raw, params)
+    except Exception as error:
+        details = f"time split unavailable: {error}"
+        for name in DEVELOPMENT_SLICES:
+            datasets[name] = _unavailable_slice_report(details)
+    else:
+        for name in DEVELOPMENT_SLICES:
+            datasets[name] = check_dataframe(
+                slices[name], contract="labeled", require_target_distribution=True
+            )
     payload = {
         "overall_status": (
             "passed"
@@ -196,8 +218,17 @@ def require_validation_gate(
         raise DataValidationError(f"validation evidence missing: {report_path}")
     report = json.loads(report_path.read_text())
     required = {"raw", *DEVELOPMENT_SLICES}
-    if report.get("overall_status") != "passed" or not required.issubset(
-        report.get("datasets", {})
+    datasets = report.get("datasets")
+    completed = isinstance(datasets, Mapping) and all(
+        isinstance(datasets.get(name), Mapping)
+        and datasets[name].get("status") == "passed"
+        for name in required
+    )
+    if (
+        report.get("overall_status") != "passed"
+        or not isinstance(datasets, Mapping)
+        or not required.issubset(datasets)
+        or not completed
     ):
         raise DataValidationError("validation report is failed or incomplete")
     return report
