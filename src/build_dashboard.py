@@ -170,7 +170,13 @@ def build(
         batch = summary["batch"]
         report_links.append(
             f'<li><a href="drift/{escape(batch)}.json">'
-            f"Native drift evidence — {escape(batch)}</a></li>"
+            f"Native drift evidence — {escape(batch)}</a><br>"
+            f'<span class="evidence-id">Native drift {escape(batch)} · model '
+            f"{escape(str(summary['promoted_model_id']))} · operating threshold "
+            f"{escape(_metric(summary['operating_threshold'], 2))} · batch fingerprint "
+            f"{escape(summary['batch_data_fingerprint'])} · labels "
+            f"{escape(summary['label_status'])} · Evidently "
+            f"{escape(summary['evidently']['status'])}</span></li>"
         )
         html_report = drift_dir / f"{batch}.html"
         if summary["evidently"]["status"] == "generated" and html_report.exists():
@@ -182,6 +188,13 @@ def build(
 
     costs = operating_point["cost_assumptions"]
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    evidence_id = (
+        f"Model {escape(promotion['promoted_model_id'])} · "
+        f"MLflow run {escape(promotion['mlflow_run_id'])} · "
+        f"registry version {escape(str(promotion['registered_model_version']))} · "
+        f"operating threshold {escape(_metric(operating_point['threshold'], 2))} · "
+        f"status {escape(trigger['overall_status'])}"
+    )
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -190,6 +203,7 @@ def build(
 
 <h1>Credit card fraud detection — monitoring dashboard</h1>
 <p class="sub">Evidence-contract rendering · generated {generated}</p>
+<p class="evidence-id">{evidence_id}</p>
 
 <h2>Promotion and data evidence</h2>
 <div class="grid">

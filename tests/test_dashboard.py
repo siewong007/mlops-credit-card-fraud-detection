@@ -140,6 +140,23 @@ def test_build_renders_joined_operating_evidence_before_default_comparison(tmp_p
     assert 'href="drift/prod_1.html"' not in html
 
 
+def test_build_renders_stable_evidence_identity_markers(tmp_path):
+    reports, site = _evidence(tmp_path)
+
+    build(reports, site)
+
+    html = (site / "index.html").read_text(encoding="utf-8")
+    assert (
+        "Model fraud-detector:v3 · MLflow run run-123 · registry version 3 · "
+        "operating threshold 0.42 · status ok"
+    ) in html
+    assert (
+        f"Native drift prod_1 · model fraud-detector:v3 · operating threshold "
+        f"0.42 · batch fingerprint {'b' * 64} · labels pending · "
+        f"Evidently failed"
+    ) in html
+
+
 def test_build_rejects_drift_and_decision_batch_mismatch(tmp_path):
     """Catches silently rendering unrelated drift and trigger evidence together."""
     reports, site = _evidence(tmp_path)
