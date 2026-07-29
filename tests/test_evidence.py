@@ -163,6 +163,34 @@ def test_manifest_contains_only_invariant_reproducibility_fields(
     }
 
 
+def test_manifest_counts_a_dataset_that_carries_no_provenance(tmp_path, monkeypatch):
+    """Catches the manifest dying on a raw CSV added by hand (README setup path)."""
+    raw = tmp_path / "creditcard.csv"
+    raw.write_text("Time,V1,Amount,Class\n0,0,1,0\n1,0,2,1\n2,0,3,0\n")
+    params = tmp_path / "params.yaml"
+    params.write_text("data: {}\n")
+    monkeypatch.setattr("src.evidence.RAW_PATH", raw)
+    monkeypatch.setattr("src.evidence.PARAMS_PATH", params)
+    monkeypatch.setattr("src.evidence.load_params", lambda: {"data": {}})
+    # What read_provenance returns when data/raw/PROVENANCE.json is absent.
+    monkeypatch.setattr(
+        "src.evidence.read_provenance", lambda _: {"source": "unknown"}
+    )
+    monkeypatch.setattr(
+        "src.evidence.installed_direct_dependencies", lambda _: {"pandas": "2.3.3"}
+    )
+
+    manifest = build_run_manifest(source_commit="a" * 40)
+
+    assert manifest["data"] == {
+        "source": "unknown",
+        "rows": 3,
+        "fraud": 1,
+        "fraud_rate": round(1 / 3, 6),
+        "fingerprint_sha256": sha256_file(raw),
+    }
+
+
 def test_explicit_empty_source_commit_does_not_defer_to_environment(monkeypatch):
     """Catches an explicit invalid source SHA being silently replaced by the env value."""
     monkeypatch.setenv("SOURCE_COMMIT", "b" * 40)

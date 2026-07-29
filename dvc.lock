@@ -1,36 +1,5 @@
 schema: '2.0'
 stages:
-  data:
-    cmd: python -m src.simulate_data
-    deps:
-    - path: src/config.py
-      hash: md5
-      md5: 1feada43f632faace39521b2890b1c08
-      size: 2192
-    - path: src/evidence.py
-      hash: md5
-      md5: b90b7ac91875448fb33fca5df0676cd4
-      size: 3909
-    - path: src/simulate_data.py
-      hash: md5
-      md5: da22395c7d184d5b9391afe649da2dfa
-      size: 2950
-    params:
-      params.yaml:
-        data.raw_path: data/raw/creditcard.csv
-        simulate:
-          n_rows: 80000
-          fraud_rate: 0.0018
-          random_state: 42
-    outs:
-    - path: data/raw/PROVENANCE.json
-      hash: md5
-      md5: 71f842048a7d09daa844cea93a7c1f83
-      size: 140
-    - path: data/raw/creditcard.csv
-      hash: md5
-      md5: a6a4a40cef6949dcd101debf8e5548c7
-      size: 45291259
   validate:
     cmd: python -m src.validate
     deps:
@@ -191,11 +160,11 @@ stages:
       size: 879
     - path: reports/experiment_comparison.json
       hash: md5
-      md5: b0e5c95814d1813c22e9aedde2a80ae7
+      md5: 55ab9b67d31fba9d36285e306112c6da
       size: 1445
     - path: reports/promotion_record.json
       hash: md5
-      md5: 43ee43f999793ffa15da1e1a6f492571
+      md5: bca06fa4da0961b61a0d8e833b2ac2c2
       size: 1045
   threshold:
     cmd: python -m src.threshold
@@ -214,7 +183,7 @@ stages:
       size: 879
     - path: reports/promotion_record.json
       hash: md5
-      md5: 43ee43f999793ffa15da1e1a6f492571
+      md5: bca06fa4da0961b61a0d8e833b2ac2c2
       size: 1045
     - path: src/artifacts.py
       hash: md5
@@ -252,7 +221,7 @@ stages:
     outs:
     - path: models/threshold.json
       hash: md5
-      md5: fc46407b21d630f224ec77b22f1e5c7c
+      md5: 2ad9373314712d4dd78c0698660faf8c
       size: 593
     - path: reports/figures/threshold_tradeoff.png
       hash: md5
@@ -260,7 +229,7 @@ stages:
       size: 44391
     - path: reports/operating_point.json
       hash: md5
-      md5: fc46407b21d630f224ec77b22f1e5c7c
+      md5: 2ad9373314712d4dd78c0698660faf8c
       size: 593
   evaluate:
     cmd: python -m src.evaluate
@@ -279,7 +248,7 @@ stages:
       size: 879
     - path: models/threshold.json
       hash: md5
-      md5: fc46407b21d630f224ec77b22f1e5c7c
+      md5: 2ad9373314712d4dd78c0698660faf8c
       size: 593
     - path: src/artifacts.py
       hash: md5
@@ -320,11 +289,11 @@ stages:
       size: 18712
     - path: reports/metrics_default.json
       hash: md5
-      md5: 69c0449db438d0c94648b6d31dbd283a
+      md5: b9429a060a14a1523f1fd101356c0738
       size: 481
     - path: reports/metrics_operating.json
       hash: md5
-      md5: aa0eea3051fd685e5ff94c5a511b853b
+      md5: c81f7bfb762fd94d37924a760ecf5dc4
       size: 443
   inference:
     cmd: python -m src.batch_inference
@@ -351,11 +320,11 @@ stages:
       size: 879
     - path: models/threshold.json
       hash: md5
-      md5: fc46407b21d630f224ec77b22f1e5c7c
+      md5: 2ad9373314712d4dd78c0698660faf8c
       size: 593
     - path: reports/promotion_record.json
       hash: md5
-      md5: 43ee43f999793ffa15da1e1a6f492571
+      md5: bca06fa4da0961b61a0d8e833b2ac2c2
       size: 1045
     - path: src/artifacts.py
       hash: md5
@@ -384,15 +353,15 @@ stages:
     outs:
     - path: data/batches/preds_prod_1.csv
       hash: md5
-      md5: 211829ae79984fa4a80125c4a17f0e91
+      md5: e2127a58e36636975a3baf770a9746aa
       size: 1074756
     - path: data/batches/preds_prod_2.csv
       hash: md5
-      md5: d49eeac5370739a0d4e9ea4e1d0ab8e0
+      md5: f619b1220800e35fa34aab5692e73678
       size: 1074807
     - path: data/batches/preds_prod_3.csv
       hash: md5
-      md5: bee6a6130ff3a049bbd3f5aecf89065e
+      md5: f6cc45a2e6ffc7f1e3baa09317cd936d
       size: 1078510
   drift:
     cmd: python -m src.drift
@@ -403,15 +372,15 @@ stages:
       size: 4460948
     - path: data/batches/preds_prod_1.csv
       hash: md5
-      md5: 211829ae79984fa4a80125c4a17f0e91
+      md5: e2127a58e36636975a3baf770a9746aa
       size: 1074756
     - path: data/batches/preds_prod_2.csv
       hash: md5
-      md5: d49eeac5370739a0d4e9ea4e1d0ab8e0
+      md5: f619b1220800e35fa34aab5692e73678
       size: 1074807
     - path: data/batches/preds_prod_3.csv
       hash: md5
-      md5: bee6a6130ff3a049bbd3f5aecf89065e
+      md5: f6cc45a2e6ffc7f1e3baa09317cd936d
       size: 1078510
     - path: data/batches/prod_1.csv
       hash: md5
@@ -439,7 +408,7 @@ stages:
       size: 879
     - path: models/threshold.json
       hash: md5
-      md5: fc46407b21d630f224ec77b22f1e5c7c
+      md5: 2ad9373314712d4dd78c0698660faf8c
       size: 593
     - path: src/artifacts.py
       hash: md5
@@ -480,19 +449,19 @@ stages:
     outs:
     - path: reports/drift/prod_1.json
       hash: md5
-      md5: d9cd41fc93911c038a9c90faea00fc8a
+      md5: 77747b782e4964c9694aff50f9d25d34
       size: 3296
     - path: reports/drift/prod_2.json
       hash: md5
-      md5: f44f8d7ef7996bf60ce8c42b5b824d57
+      md5: d6b689898d91247ce7c7596362f44620
       size: 3330
     - path: reports/drift/prod_3.json
       hash: md5
-      md5: 6c5252dce91e11e738ff5f0e698f583b
+      md5: c2d96b4b099a506c04c7190ba324f32b
       size: 3267
     - path: reports/drift_summary.json
       hash: md5
-      md5: dba227b67296c320a615dc8ec515b6ed
+      md5: 846d7774cdcbd4c6b6a9cbc9690ea7ae
       size: 2125
     - path: reports/figures/psi_prod_1.png
       hash: md5
@@ -511,11 +480,11 @@ stages:
     deps:
     - path: reports/drift_summary.json
       hash: md5
-      md5: dba227b67296c320a615dc8ec515b6ed
+      md5: 846d7774cdcbd4c6b6a9cbc9690ea7ae
       size: 2125
     - path: reports/operating_point.json
       hash: md5
-      md5: fc46407b21d630f224ec77b22f1e5c7c
+      md5: 2ad9373314712d4dd78c0698660faf8c
       size: 593
     - path: src/config.py
       hash: md5
@@ -538,9 +507,9 @@ stages:
     outs:
     - path: reports/trigger_decisions.json
       hash: md5
-      md5: cba3f61d2c6d3b3b77c0b6d1def2b1a2
+      md5: dc15f6a4eee12030c7e7ee91dd0ce9d3
       size: 2041
     - path: reports/trigger_log.md
       hash: md5
-      md5: c5a3ffaf7b745880a4873761ffdf3c50
+      md5: 5738caca363026c3e4e27ae52af118a5
       size: 885

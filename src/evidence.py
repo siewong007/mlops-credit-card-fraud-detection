@@ -10,6 +10,8 @@ import re
 import subprocess
 from importlib import metadata
 
+import pandas as pd
+
 from src.config import REPORTS_DIR, ROOT, load_params, read_provenance
 
 
@@ -83,22 +85,44 @@ def _source_commit(explicit: str | None) -> str:
     return commit
 
 
+def _data_evidence(params: dict) -> dict:
+    """Describe the raw dataset, counting it when no sidecar record exists.
+
+    ``fetch_data`` and ``simulate_data`` write PROVENANCE.json, but a Kaggle CSV
+    dropped into ``data/raw/`` by hand (a documented setup path) carries none,
+    and ``read_provenance`` then reports only ``source: unknown``. Row and fraud
+    counts are objective properties of the file, so derive them rather than
+    failing the run at its last stage; only ``source`` is genuinely unknown.
+    """
+    provenance = read_provenance(params)
+    counted = {"rows", "fraud", "fraud_rate"}.issubset(provenance)
+    if counted:
+        rows = int(provenance["rows"])
+        fraud = int(provenance["fraud"])
+        fraud_rate = float(provenance["fraud_rate"])
+    else:
+        target = pd.read_csv(RAW_PATH, usecols=["Class"])["Class"]
+        rows = len(target)
+        fraud = int((target == 1).sum())
+        fraud_rate = round(fraud / rows, 6) if rows else 0.0
+    return {
+        "source": provenance.get("source", "unknown"),
+        "rows": rows,
+        "fraud": fraud,
+        "fraud_rate": fraud_rate,
+        "fingerprint_sha256": sha256_file(RAW_PATH),
+    }
+
+
 def build_run_manifest(source_commit: str | None = None) -> dict:
     """Build deterministic evidence that identifies the exact pipeline inputs."""
     params = load_params()
-    provenance = read_provenance(params)
     return {
         "schema_version": 1,
         "source_commit": _source_commit(source_commit),
         "python_version": platform.python_version(),
         "dependencies": installed_direct_dependencies(ROOT / "requirements.txt"),
-        "data": {
-            "source": provenance["source"],
-            "rows": int(provenance["rows"]),
-            "fraud": int(provenance["fraud"]),
-            "fraud_rate": float(provenance["fraud_rate"]),
-            "fingerprint_sha256": sha256_file(RAW_PATH),
-        },
+        "data": _data_evidence(params),
         "parameters": {
             "path": "params.yaml",
             "fingerprint_sha256": sha256_file(PARAMS_PATH),

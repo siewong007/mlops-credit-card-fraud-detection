@@ -1,17 +1,10 @@
+# The raw dataset is an INPUT to this graph, never an output. DVC deletes a
+# stage's declared outputs before running it, so a `data` stage that generated
+# data/raw/creditcard.csv would erase a real ULB dataset on any `dvc repro` —
+# unrecoverably, since that file is gitignored and no DVC remote is configured.
+# Seed the input first (`make data`, or `make fetch-data` for the real thing);
+# its hash is recorded as a dependency, which pins lineage just as precisely.
 stages:
-  data:
-    cmd: python -m src.simulate_data
-    deps:
-      - src/simulate_data.py
-      - src/config.py
-      - src/evidence.py
-    params:
-      - simulate
-      - data.raw_path
-    outs:
-      - data/raw/creditcard.csv
-      - data/raw/PROVENANCE.json
-
   validate:
     cmd: python -m src.validate
     deps:
