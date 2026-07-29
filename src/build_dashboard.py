@@ -128,6 +128,14 @@ def build(
                 f"native per-batch drift evidence does not match current summary: "
                 f"{summary['batch']}"
             )
+        evidently_html = drift_dir / f"{summary['batch']}.html"
+        if (
+            summary["evidently"]["status"] == "generated"
+            and not evidently_html.is_file()
+        ):
+            raise FileNotFoundError(
+                f"generated Evidently HTML evidence missing: {evidently_html}"
+            )
 
     site_dir.mkdir(parents=True, exist_ok=True)
     (site_dir / ".nojekyll").write_text("")
@@ -179,7 +187,7 @@ def build(
             f"{escape(summary['evidently']['status'])}</span></li>"
         )
         html_report = drift_dir / f"{batch}.html"
-        if summary["evidently"]["status"] == "generated" and html_report.exists():
+        if summary["evidently"]["status"] == "generated":
             report_links.append(
                 f'<li><a href="drift/{escape(batch)}.html">'
                 f"Evidently HTML — {escape(batch)}</a></li>"

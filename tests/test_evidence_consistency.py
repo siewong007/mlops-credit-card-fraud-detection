@@ -33,6 +33,10 @@ def test_generated_evidence_is_internally_consistent():
     assert comparison["promoted_run_id"] == promotion["mlflow_run_id"]
 
     promoted_model_id = promotion["promoted_model_id"]
+    registered_model_version = str(promotion["registered_model_version"])
+    assert promoted_model_id == (
+        f"{promotion['registered_model_name']}:v{registered_model_version}"
+    )
     assert operating_point["promoted_model_id"] == promoted_model_id
     assert default["promoted_model_id"] == promoted_model_id
     assert operating["promoted_model_id"] == promoted_model_id
@@ -40,6 +44,29 @@ def test_generated_evidence_is_internally_consistent():
     assert default["threshold"] == 0.5
     assert default["evidence_role"] == "comparison_default_threshold"
     assert operating["evidence_role"] == "primary_operating_point"
+
+    for field in (
+        "pr_auc",
+        "roc_auc",
+        "precision",
+        "recall",
+        "f1",
+        "false_positive_rate",
+        "false_negative_rate",
+        "tp",
+        "fp",
+        "fn",
+        "tn",
+        "threshold",
+        "estimated_business_cost",
+    ):
+        assert operating_point["calibration_metrics"][field] == operating[field]
+    assert operating_point["estimated_business_cost"] == (
+        operating_point["calibration_metrics"]["estimated_business_cost"]
+    )
+    assert operating_point["estimated_business_cost"] == operating[
+        "estimated_business_cost"
+    ]
 
     costs = operating_point["cost_assumptions"]
     for metrics in (default, operating):
@@ -58,6 +85,13 @@ def test_generated_evidence_is_internally_consistent():
         key=severity.__getitem__,
     )
     assert trigger["overall_status"] == expected_overall
+    assert trigger["baseline"]["promoted_model_id"] == operating_point[
+        "promoted_model_id"
+    ]
+    assert trigger["baseline"]["operating_threshold"] == operating_point["threshold"]
+    assert trigger["baseline"]["pr_auc"] == operating_point["calibration_metrics"][
+        "pr_auc"
+    ]
 
     for summary, decision in zip(drift, trigger["decisions"], strict=True):
         assert summary["promoted_model_id"] == promoted_model_id
@@ -68,6 +102,9 @@ def test_generated_evidence_is_internally_consistent():
         assert summary["label_status"] == decision["label_status"]
         assert decision["reason_codes"]
         for key in (
+            "pr_auc",
+            "recall",
+            "pct_drifted_features",
             "promoted_model_id",
             "operating_threshold",
             "batch_data_fingerprint",
@@ -81,6 +118,17 @@ def test_generated_evidence_is_internally_consistent():
         assert native["evidently"] == summary["evidently"]
 
     assert manifest["python_version"] == "3.13.9"
+    for fingerprint in (
+        validation["raw_data_fingerprint"],
+        manifest["data"]["fingerprint_sha256"],
+        manifest["parameters"]["fingerprint_sha256"],
+        promotion["data_fingerprint"],
+        promotion["parameter_fingerprint"],
+        operating_point["calibration_data_fingerprint"],
+        default["calibration_data_fingerprint"],
+        operating["calibration_data_fingerprint"],
+    ):
+        assert re.fullmatch(r"[0-9a-f]{64}", fingerprint)
     assert validation["raw_data_fingerprint"] == manifest["data"][
         "fingerprint_sha256"
     ]

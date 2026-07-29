@@ -180,6 +180,26 @@ def test_build_rejects_stale_native_batch_evidence(tmp_path):
         build(reports, site)
 
 
+def test_build_rejects_missing_generated_evidently_report(tmp_path):
+    reports, site = _evidence(tmp_path)
+    generated = {"status": "generated", "error_type": None, "message": None}
+    summary_path = reports / "drift_summary.json"
+    summaries = json.loads(summary_path.read_text(encoding="utf-8"))
+    summaries[0]["evidently"] = generated
+    _write(summary_path, summaries)
+    native_path = reports / "drift" / "prod_1.json"
+    native = json.loads(native_path.read_text(encoding="utf-8"))
+    native["evidently"] = generated
+    _write(native_path, native)
+    (reports / "drift" / "prod_1.html").unlink()
+
+    with pytest.raises(
+        FileNotFoundError,
+        match=r"generated Evidently HTML evidence missing: .*prod_1\.html",
+    ):
+        build(reports, site)
+
+
 def test_build_renders_null_evidence_values_as_na(tmp_path):
     """Catches nullable evidence leaking as an exception or literal None."""
     reports, site = _evidence(tmp_path)
