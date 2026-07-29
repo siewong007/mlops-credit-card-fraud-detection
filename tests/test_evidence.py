@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from src import config
 from src.evidence import sha256_file, write_json
 
 
@@ -20,3 +21,13 @@ def test_write_json_is_sorted_and_rejects_nan(tmp_path):
     assert json.loads(target.read_text()) == {"a": 1, "z": 2}
     with pytest.raises(ValueError):
         write_json(target, {"metric": float("nan")})
+
+
+def test_provenance_writer_rejects_non_strict_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "ROOT", tmp_path)
+    params = {"data": {"raw_path": "data/raw/creditcard.csv"}}
+
+    with pytest.raises(ValueError):
+        config.write_provenance(params, float("nan"), rows=1, fraud=0)
+
+    assert not config.provenance_path(params).exists()

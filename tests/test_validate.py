@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,15 @@ from src.validate import (
     validate_file,
 )
 
+PARAMS = {
+    "data": {
+        "train_frac": 0.5,
+        "model_valid_frac": 0.1,
+        "calibration_frac": 0.1,
+        "n_prod_batches": 3,
+    }
+}
+
 
 def _frame(n=1000, labeled=True):
     data = {"Time": np.arange(n, dtype=float)}
@@ -22,6 +32,13 @@ def _frame(n=1000, labeled=True):
         target[-2:] = 1
         data["Class"] = target
     return pd.DataFrame(data)
+
+
+def _valid_frame():
+    frame = _frame()
+    frame["Class"] = 0
+    frame.loc[[10, 510, 610], "Class"] = 1
+    return frame
 
 
 def test_labeled_contract_checks_distribution_and_finite_values():
@@ -68,20 +85,16 @@ def test_validate_file_writes_failed_evidence_before_raising(tmp_path):
     raw_path = tmp_path / "raw.csv"
     report_path = tmp_path / "validation_report.json"
     _frame().to_csv(raw_path, index=False)
-    params = {
-        "data": {
-            "train_frac": 0.5,
-            "model_valid_frac": 0.1,
-            "calibration_frac": 0.1,
-            "n_prod_batches": 3,
-        }
-    }
 
     with pytest.raises(DataValidationError):
-        validate_file(raw_path, params, report_path)
+        validate_file(raw_path, PARAMS, report_path)
 
     report = json.loads(report_path.read_text())
     assert report["overall_status"] == "failed"
+    assert report["raw_data_fingerprint"] == (
+        "453c58699473bf7c42d44e85f1ef1d991016d0767c51085da3e5b984841ae6b1"
+    )
+    assert len(report["split_parameter_fingerprint"]) == 64
     assert set(report["datasets"]) == {"raw", "train", "model_valid", "calibration"}
     assert "NaN" not in report_path.read_text()
 
@@ -90,17 +103,9 @@ def test_validate_file_reports_unsplittable_raw_schema_before_raising(tmp_path):
     raw_path = tmp_path / "raw.csv"
     report_path = tmp_path / "validation_report.json"
     _frame().drop(columns=["Time"]).to_csv(raw_path, index=False)
-    params = {
-        "data": {
-            "train_frac": 0.5,
-            "model_valid_frac": 0.1,
-            "calibration_frac": 0.1,
-            "n_prod_batches": 3,
-        }
-    }
 
     with pytest.raises(DataValidationError):
-        validate_file(raw_path, params, report_path)
+        validate_file(raw_path, PARAMS, report_path)
 
     report = json.loads(report_path.read_text())
     assert report["overall_status"] == "failed"
@@ -111,13 +116,17 @@ def test_validate_file_reports_unsplittable_raw_schema_before_raising(tmp_path):
 
 
 def test_validation_gate_rejects_missing_failed_or_incomplete_report(tmp_path):
-    path = tmp_path / "validation_report.json"
+    raw_path = tmp_path / "raw.csv"
+    raw_path.write_text("raw", encoding="utf-8")
+    report_path = tmp_path / "validation_report.json"
     with pytest.raises(DataValidationError):
-        require_validation_gate(path)
+        require_validation_gate(raw_path, PARAMS, report_path)
 
 
 def test_validation_gate_rejects_empty_or_failed_dataset_evidence(tmp_path):
-    path = tmp_path / "validation_report.json"
+    raw_path = tmp_path / "raw.csv"
+    raw_path.write_text("raw", encoding="utf-8")
+    report_path = tmp_path / "validation_report.json"
     required = ("raw", "train", "model_valid", "calibration")
     for datasets in (
         {name: {} for name in required},
@@ -126,13 +135,17 @@ def test_validation_gate_rejects_empty_or_failed_dataset_evidence(tmp_path):
             for name in required
         },
     ):
-        path.write_text(json.dumps({"overall_status": "passed", "datasets": datasets}))
+        report_path.write_text(
+            json.dumps({"overall_status": "passed", "datasets": datasets})
+        )
         with pytest.raises(DataValidationError):
-            require_validation_gate(path)
-    path.write_text(json.dumps({"overall_status": "failed", "datasets": {}}))
+            require_validation_gate(raw_path, PARAMS, report_path)
+    report_path.write_text(
+        json.dumps({"overall_status": "failed", "datasets": {}})
+    )
     with pytest.raises(DataValidationError):
-        require_validation_gate(path)
-    path.write_text(
+        require_validation_gate(raw_path, PARAMS, report_path)
+    report_path.write_text(
         json.dumps(
             {
                 "overall_status": "passed",
@@ -141,4 +154,75 @@ def test_validation_gate_rejects_empty_or_failed_dataset_evidence(tmp_path):
         )
     )
     with pytest.raises(DataValidationError):
-        require_validation_gate(path)
+        require_validation_gate(raw_path, PARAMS, report_path)
+
+
+def test_validation_gate_rejects_raw_mutation_after_passing_report(tmp_path):
+    raw_path = tmp_path / "raw.csv"
+    report_path = tmp_path / "validation_report.json"
+    frame = _valid_frame()
+    frame.to_csv(raw_path, index=False)
+    validate_file(raw_path, PARAMS, report_path)
+    require_validation_gate(raw_path, PARAMS, report_path)
+
+    frame.loc[0, "Amount"] = 2.0
+    frame.to_csv(raw_path, index=False)
+
+    with pytest.raises(DataValidationError, match="raw data fingerprint"):
+        require_validation_gate(raw_path, PARAMS, report_path)
+
+
+def test_validation_gate_rejects_split_parameter_mutation(tmp_path):
+    raw_path = tmp_path / "raw.csv"
+    report_path = tmp_path / "validation_report.json"
+    _valid_frame().to_csv(raw_path, index=False)
+    validate_file(raw_path, PARAMS, report_path)
+    changed = deepcopy(PARAMS)
+    changed["data"]["train_frac"] = 0.4
+
+    with pytest.raises(DataValidationError, match="split parameter fingerprint"):
+        require_validation_gate(raw_path, changed, report_path)
+
+
+def test_read_failure_replaces_preexisting_success_evidence(
+    tmp_path, monkeypatch
+):
+    raw_path = tmp_path / "raw.csv"
+    report_path = tmp_path / "validation_report.json"
+    _valid_frame().to_csv(raw_path, index=False)
+    validate_file(raw_path, PARAMS, report_path)
+    assert json.loads(report_path.read_text())["overall_status"] == "passed"
+
+    def fail_read(*args, **kwargs):
+        raise OSError("read failed")
+
+    monkeypatch.setattr(pd, "read_csv", fail_read)
+
+    with pytest.raises(DataValidationError, match="read raw data"):
+        validate_file(raw_path, PARAMS, report_path)
+
+    text = report_path.read_text()
+    report = json.loads(text)
+    assert report["overall_status"] == "failed"
+    assert report["datasets"]["raw"]["status"] == "failed"
+    assert "read failed" in report["datasets"]["raw"]["checks"][0]["details"]
+    assert "NaN" not in text
+
+
+def test_missing_raw_replaces_preexisting_success_evidence(tmp_path):
+    raw_path = tmp_path / "missing.csv"
+    report_path = tmp_path / "validation_report.json"
+    report_path.write_text(
+        json.dumps({"overall_status": "passed"}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(DataValidationError, match="read raw data"):
+        validate_file(raw_path, PARAMS, report_path)
+
+    text = report_path.read_text(encoding="utf-8")
+    report = json.loads(text)
+    assert report["overall_status"] == "failed"
+    assert report["raw_data_fingerprint"] is None
+    assert report["datasets"]["raw"]["status"] == "failed"
+    assert "NaN" not in text

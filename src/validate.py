@@ -1,6 +1,7 @@
 """Labeled-development and inference validation contracts."""
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -10,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from src.config import REPORTS_DIR, ROOT, load_params
-from src.evidence import write_json
+from src.evidence import sha256_file, write_json
 
 try:
     import pandera.pandas as pa
@@ -23,6 +24,12 @@ ContractName = Literal["labeled", "inference"]
 FEATURE_COLUMNS = ["Time", *[f"V{i}" for i in range(1, 29)], "Amount"]
 LABELED_COLUMNS = [*FEATURE_COLUMNS, "Class"]
 DEVELOPMENT_SLICES = ("train", "model_valid", "calibration")
+SPLIT_PARAMETERS = (
+    "train_frac",
+    "model_valid_frac",
+    "calibration_frac",
+    "n_prod_batches",
+)
 
 _FINITE = Check(lambda series: bool(np.isfinite(series).all()))
 _FEATURE_SCHEMA_COLUMNS = {
@@ -67,6 +74,10 @@ def _is_non_negative_time_and_amount(df: pd.DataFrame) -> bool:
 
 
 def _unavailable_slice_report(details: str) -> dict:
+    return _unavailable_report("slice_unavailable", details)
+
+
+def _unavailable_report(check_name: str, details: str) -> dict:
     return {
         "contract": "labeled",
         "status": "failed",
@@ -77,8 +88,21 @@ def _unavailable_slice_report(details: str) -> dict:
         "ranges": {},
         "fraud_count": None,
         "fraud_rate": None,
-        "checks": [_check("slice_unavailable", False, details)],
+        "checks": [_check(check_name, False, details)],
     }
+
+
+def _split_parameter_fingerprint(params: dict) -> str:
+    split_parameters = {
+        name: params["data"][name] for name in SPLIT_PARAMETERS
+    }
+    canonical = json.dumps(
+        split_parameters,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def check_dataframe(
@@ -182,7 +206,30 @@ def validate_file(
     """Write all required validation evidence before failing invalid data."""
     from src.ingest import split_by_time
 
-    raw = pd.read_csv(path)
+    split_parameter_fingerprint = _split_parameter_fingerprint(params)
+    raw_data_fingerprint = None
+    try:
+        raw_data_fingerprint = sha256_file(path)
+        raw = pd.read_csv(path)
+        if sha256_file(path) != raw_data_fingerprint:
+            raise OSError("raw data changed while being read")
+    except Exception as error:
+        details = f"raw CSV read failed: {error}"
+        payload = {
+            "overall_status": "failed",
+            "raw_data_fingerprint": raw_data_fingerprint,
+            "split_parameter_fingerprint": split_parameter_fingerprint,
+            "datasets": {
+                "raw": _unavailable_report("read_csv", details),
+                **{
+                    name: _unavailable_slice_report(details)
+                    for name in DEVELOPMENT_SLICES
+                },
+            },
+        }
+        write_json(report_path, payload)
+        raise DataValidationError(f"could not read raw data: {error}") from error
+
     datasets = {
         "raw": check_dataframe(
             raw, contract="labeled", require_target_distribution=True
@@ -205,6 +252,8 @@ def validate_file(
             if all(report["status"] == "passed" for report in datasets.values())
             else "failed"
         ),
+        "raw_data_fingerprint": raw_data_fingerprint,
+        "split_parameter_fingerprint": split_parameter_fingerprint,
         "datasets": datasets,
     }
     write_json(report_path, payload)
@@ -214,6 +263,8 @@ def validate_file(
 
 
 def require_validation_gate(
+    raw_path: str | Path,
+    params: dict,
     report_path: Path = REPORTS_DIR / "validation_report.json",
 ) -> dict:
     if not report_path.exists():
@@ -233,6 +284,16 @@ def require_validation_gate(
         or not completed
     ):
         raise DataValidationError("validation report is failed or incomplete")
+    if report.get("raw_data_fingerprint") != sha256_file(raw_path):
+        raise DataValidationError(
+            "validation report raw data fingerprint does not match current input"
+        )
+    if report.get(
+        "split_parameter_fingerprint"
+    ) != _split_parameter_fingerprint(params):
+        raise DataValidationError(
+            "validation report split parameter fingerprint does not match current input"
+        )
     return report
 
 

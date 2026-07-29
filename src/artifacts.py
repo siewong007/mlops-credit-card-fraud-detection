@@ -13,7 +13,6 @@ from src.config import MODELS_DIR, REPORTS_DIR
 from src.evidence import write_json
 
 _MODEL_PATH = MODELS_DIR / "model.joblib"
-_BASELINE_PATH = MODELS_DIR / "baseline.json"
 _THRESHOLD_PATH = MODELS_DIR / "threshold.json"
 
 
@@ -21,15 +20,6 @@ def load_model():
     if not _MODEL_PATH.exists():
         raise FileNotFoundError(f"{_MODEL_PATH} missing — run `make train` first")
     return joblib.load(_MODEL_PATH)
-
-
-def load_baseline() -> dict:
-    return json.loads(_BASELINE_PATH.read_text())
-
-
-def save_threshold(payload: dict) -> None:
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    write_json(_THRESHOLD_PATH, payload)
 
 
 def save_operating_point(payload: dict) -> None:

@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
+import pytest
 
+from src import ingest
 from src.ingest import SPLIT_NAMES, inject_drift, split_by_time
 
 PARAMS = {
@@ -67,3 +69,29 @@ def test_inject_drift_shifts_amount_and_signal_features():
     # Fraud rows shift twice as far as legit on a signal feature (concept drift).
     fraud, legit = out["Class"] == 1, out["Class"] == 0
     assert out.loc[fraud, "V14"].mean() > out.loc[legit, "V14"].mean() + 1.0
+
+
+def test_main_gates_the_exact_raw_path_and_split_params(tmp_path, monkeypatch):
+    class GateObserved(Exception):
+        pass
+
+    params = {
+        "data": {
+            **PARAMS["data"],
+            "raw_path": "data/raw/source.csv",
+            "batch_dir": "data/batches",
+        }
+    }
+    expected_path = tmp_path / "data/raw/source.csv"
+    monkeypatch.setattr(ingest, "ROOT", tmp_path)
+    monkeypatch.setattr(ingest, "load_params", lambda: params)
+
+    def observe_gate(raw_path, supplied_params):
+        assert raw_path == expected_path
+        assert supplied_params is params
+        raise GateObserved
+
+    monkeypatch.setattr("src.validate.require_validation_gate", observe_gate)
+
+    with pytest.raises(GateObserved):
+        ingest.main()

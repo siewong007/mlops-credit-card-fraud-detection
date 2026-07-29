@@ -27,6 +27,9 @@ def _batch(drift=0, pr_auc=0.9, recall=0.9, labels="available"):
         "pct_drifted_features": drift,
         "pr_auc": pr_auc if labels == "available" else None,
         "recall": recall if labels == "available" else None,
+        "promoted_model_id": "fraud-detector:v3",
+        "operating_threshold": 0.42,
+        "batch_data_fingerprint": "a" * 64,
     }
 
 
@@ -70,6 +73,22 @@ def test_pending_labels_ignore_performance_rules_and_retain_drift_rules():
     assert retrain["reason_codes"] == ["LABELS_PENDING", "FEATURE_DRIFT_RETRAIN"]
 
 
+def test_available_one_class_metrics_skip_both_performance_rules_and_keep_drift():
+    batch = _batch(drift=25, pr_auc=None, recall=0.0, labels="available")
+
+    result = evaluate_batch(0.9, batch, PARAMS)
+
+    assert result["label_status"] == "available"
+    assert result["status"] == "warning"
+    assert result["reason_codes"] == [
+        "PERFORMANCE_METRICS_UNAVAILABLE",
+        "FEATURE_DRIFT_WARNING",
+    ]
+    assert result["observed"]["pr_auc"] is None
+    assert result["observed"]["recall"] == 0.0
+    json.dumps(result, allow_nan=False)
+
+
 def test_report_uses_operating_point_baseline_and_highest_severity():
     batches = [
         {**_batch(drift=0), "batch": "prod_1"},
@@ -87,10 +106,40 @@ def test_report_uses_operating_point_baseline_and_highest_severity():
     )
     assert report["baseline"]["pr_auc"] == 0.9
     assert report["overall_status"] == "retrain"
+    assert report["decisions"][0]["observed"]["promoted_model_id"] == (
+        "fraud-detector:v3"
+    )
+    assert report["decisions"][0]["observed"]["operating_threshold"] == 0.42
+    assert report["decisions"][0]["observed"]["batch_data_fingerprint"] == "a" * 64
     assert github_annotation({"overall_status": "ok"}) is None
     assert github_annotation({"overall_status": "warning"}).startswith("::notice")
     assert github_annotation(report).startswith("::warning")
     assert "human approval" in github_annotation(report)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("promoted_model_id", "fraud-detector:v999", "model"),
+        ("operating_threshold", 0.5, "threshold"),
+    ],
+)
+def test_report_rejects_drift_evidence_from_another_operating_point(
+    field, value, message
+):
+    batch = _batch()
+    batch[field] = value
+
+    with pytest.raises(ValueError, match=message):
+        build_decision_report(
+            [batch],
+            {
+                "threshold": 0.42,
+                "promoted_model_id": "fraud-detector:v3",
+                "calibration_metrics": {"pr_auc": 0.9},
+            },
+            PARAMS,
+        )
 
 
 def test_markdown_renders_nullable_performance_values_without_crashing():

@@ -112,16 +112,41 @@ def build(
         raise ValueError("drift summaries and trigger decisions have mismatched batch sets")
     decisions = [decisions_by_batch[summary["batch"]] for summary in summaries]
 
-    site_dir.mkdir(parents=True, exist_ok=True)
-    (site_dir / ".nojekyll").write_text("")
     figures_dir = reports_dir / "figures"
     drift_dir = reports_dir / "drift"
+
+    data = manifest["data"]
+    for summary in summaries:
+        native_report = drift_dir / f"{summary['batch']}.json"
+        if not native_report.exists():
+            raise FileNotFoundError(
+                f"native per-batch drift evidence missing: {native_report}"
+            )
+        native = json.loads(native_report.read_text())
+        if any(native.get(key) != value for key, value in summary.items()):
+            raise ValueError(
+                f"native per-batch drift evidence does not match current summary: "
+                f"{summary['batch']}"
+            )
+
+    site_dir.mkdir(parents=True, exist_ok=True)
+    (site_dir / ".nojekyll").write_text("")
     fig_out = site_dir / "figures"
     drift_out = site_dir / "drift"
     _copy_assets(figures_dir, fig_out)
     _copy_assets(drift_dir, drift_out)
 
-    data = manifest["data"]
+    def evidently_cell(summary):
+        evidence = summary["evidently"]
+        status = evidence["status"]
+        error = (
+            ""
+            if status == "generated"
+            else f"<br>{escape(str(evidence['error_type']))}: "
+            f"{escape(str(evidence['message']))}"
+        )
+        return f"Evidently: {escape(status)}{error}"
+
     rows = "\n".join(
         f"<tr><td><code>{escape(summary['batch'])}</code></td>"
         f"<td>{_count(summary['n_rows'])}</td><td>{_metric(summary['pr_auc'])}</td>"
@@ -130,7 +155,8 @@ def build(
         f"<td>{_metric(summary['amount_psi'])}</td><td>{_metric(summary['prediction_psi'])}</td>"
         f"<td>{escape(decision['label_status'])}</td><td>{_badge(decision['status'])}</td>"
         f"<td class=\"reason\">{escape(', '.join(decision['reason_codes']))}<br>"
-        f"{escape('; '.join(decision['reasons']))}</td></tr>"
+        f"{escape('; '.join(decision['reasons']))}</td>"
+        f"<td class=\"reason\">{evidently_cell(summary)}</td></tr>"
         for summary, decision in zip(summaries, decisions)
     )
 
@@ -139,10 +165,20 @@ def build(
         f"<figcaption>{escape(figure.stem.replace('_', ' '))}</figcaption></figure>"
         for figure in sorted(figures_dir.glob("*.png"))
     )
-    links = "\n".join(
-        f'<li><a href="drift/{escape(report.name)}">Drift report — {escape(report.stem)}</a></li>'
-        for report in sorted(drift_dir.glob("*.html"))
-    ) or '<li class="reason">No local drift reports were generated for this run.</li>'
+    report_links = []
+    for summary in summaries:
+        batch = summary["batch"]
+        report_links.append(
+            f'<li><a href="drift/{escape(batch)}.json">'
+            f"Native drift evidence — {escape(batch)}</a></li>"
+        )
+        html_report = drift_dir / f"{batch}.html"
+        if summary["evidently"]["status"] == "generated" and html_report.exists():
+            report_links.append(
+                f'<li><a href="drift/{escape(batch)}.html">'
+                f"Evidently HTML — {escape(batch)}</a></li>"
+            )
+    links = "\n".join(report_links)
 
     costs = operating_point["cost_assumptions"]
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -189,13 +225,14 @@ and false positive {escape(str(costs["false_positive"]))}.</div>
 <h2>Per-batch monitoring evidence</h2>
 <div class="scroll"><table>
 <thead><tr><th>Batch</th><th>Rows</th><th>PR-AUC</th><th>Recall</th><th>Precision</th>
-<th>Drifted</th><th>Amount PSI</th><th>Prediction PSI</th><th>Labels</th><th>Status</th><th>Decision evidence</th></tr></thead>
+<th>Drifted</th><th>Amount PSI</th><th>Prediction PSI</th><th>Labels</th><th>Status</th>
+<th>Decision evidence</th><th>Evidently</th></tr></thead>
 <tbody>{rows}</tbody></table></div>
 
 <h2>Local evaluation and drift figures</h2>
 <div class="figs">{figures}</div>
 
-<h2>Local drift reports</h2>
+<h2>Local drift evidence</h2>
 <ul class="links">{links}</ul>
 
 <footer>A <code>retrain</code> status is review-only and requires human approval;

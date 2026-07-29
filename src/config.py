@@ -40,18 +40,22 @@ def provenance_path(params: dict) -> Path:
 
 
 def write_provenance(params: dict, source: str, rows: int, fraud: int) -> None:
-    import json
     from datetime import datetime, timezone
 
-    p = provenance_path(params)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({
-        "source": source,
-        "rows": rows,
-        "fraud": fraud,
-        "fraud_rate": round(fraud / rows, 6) if rows else 0.0,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }, indent=2))
+    from src.evidence import write_json
+
+    write_json(
+        provenance_path(params),
+        {
+            "source": source,
+            "rows": rows,
+            "fraud": fraud,
+            "fraud_rate": round(fraud / rows, 6) if rows else 0.0,
+            "generated_at": datetime.now(timezone.utc).isoformat(
+                timespec="seconds"
+            ),
+        },
+    )
 
 
 def read_provenance(params: dict) -> dict:

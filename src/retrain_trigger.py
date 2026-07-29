@@ -14,19 +14,25 @@ def evaluate_batch(baseline_pr_auc: float, batch: dict, params: dict) -> dict:
     codes = []
     reasons = []
     if batch["label_status"] == "available":
-        if batch["pr_auc"] is None:
-            raise ValueError("PR-AUC is unavailable despite available batch labels")
-        drop = 100 * (baseline_pr_auc - batch["pr_auc"]) / baseline_pr_auc
-        if drop > thresholds["pr_auc_drop_pct"]:
-            codes.append("PR_AUC_DROP")
+        if batch["pr_auc"] is None or batch["recall"] is None:
+            codes.append("PERFORMANCE_METRICS_UNAVAILABLE")
             reasons.append(
-                f"PR-AUC drop {drop:.1f}% exceeds {thresholds['pr_auc_drop_pct']}%"
+                "available labels contain one class; performance rules were not evaluated"
             )
-        if batch["recall"] < thresholds["recall_floor"]:
-            codes.append("RECALL_BELOW_FLOOR")
-            reasons.append(
-                f"recall {batch['recall']:.3f} is below {thresholds['recall_floor']}"
-            )
+        else:
+            drop = 100 * (baseline_pr_auc - batch["pr_auc"]) / baseline_pr_auc
+            if drop > thresholds["pr_auc_drop_pct"]:
+                codes.append("PR_AUC_DROP")
+                reasons.append(
+                    f"PR-AUC drop {drop:.1f}% exceeds "
+                    f"{thresholds['pr_auc_drop_pct']}%"
+                )
+            if batch["recall"] < thresholds["recall_floor"]:
+                codes.append("RECALL_BELOW_FLOOR")
+                reasons.append(
+                    f"recall {batch['recall']:.3f} is below "
+                    f"{thresholds['recall_floor']}"
+                )
     else:
         codes.append("LABELS_PENDING")
         reasons.append("labels pending; performance rules were not evaluated")
@@ -63,6 +69,9 @@ def evaluate_batch(baseline_pr_auc: float, batch: dict, params: dict) -> dict:
             "pr_auc": batch["pr_auc"],
             "recall": batch["recall"],
             "pct_drifted_features": drift,
+            "promoted_model_id": batch["promoted_model_id"],
+            "operating_threshold": batch["operating_threshold"],
+            "batch_data_fingerprint": batch["batch_data_fingerprint"],
         },
     }
 
@@ -71,6 +80,19 @@ def build_decision_report(
     batches: list[dict], operating_point: dict, params: dict
 ) -> dict:
     """Build the complete review report using the calibrated operating baseline."""
+    for batch in batches:
+        if batch["promoted_model_id"] != operating_point["promoted_model_id"]:
+            raise ValueError(
+                f"drift summary model does not match operating point: "
+                f"{batch['batch']}"
+            )
+        if float(batch["operating_threshold"]) != float(
+            operating_point["threshold"]
+        ):
+            raise ValueError(
+                f"drift summary threshold does not match operating point: "
+                f"{batch['batch']}"
+            )
     baseline_pr_auc = operating_point["calibration_metrics"]["pr_auc"]
     decisions = [
         evaluate_batch(baseline_pr_auc, batch, params) for batch in batches

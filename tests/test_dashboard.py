@@ -13,6 +13,25 @@ def _write(path, payload):
 def _evidence(tmp_path):
     reports = tmp_path / "reports"
     site = tmp_path / "site"
+    summary = {
+        "batch": "prod_1",
+        "label_status": "pending",
+        "n_rows": 100,
+        "pr_auc": None,
+        "recall": None,
+        "precision": None,
+        "pct_drifted_features": 10,
+        "amount_psi": 0.03,
+        "prediction_psi": 0.05,
+        "promoted_model_id": "fraud-detector:v3",
+        "operating_threshold": 0.42,
+        "batch_data_fingerprint": "b" * 64,
+        "evidently": {
+            "status": "failed",
+            "error_type": "RuntimeError",
+            "message": "report generation failed",
+        },
+    }
     _write(
         reports / "promotion_record.json",
         {
@@ -55,19 +74,7 @@ def _evidence(tmp_path):
     )
     _write(
         reports / "drift_summary.json",
-        [
-            {
-                "batch": "prod_1",
-                "label_status": "pending",
-                "n_rows": 100,
-                "pr_auc": None,
-                "recall": None,
-                "precision": None,
-                "pct_drifted_features": 10,
-                "amount_psi": 0.03,
-                "prediction_psi": 0.05,
-            }
-        ],
+        [summary],
     )
     _write(
         reports / "trigger_decisions.json",
@@ -91,8 +98,12 @@ def _evidence(tmp_path):
     (reports / "figures").mkdir()
     (reports / "figures" / "pr_curve.png").write_bytes(b"local figure")
     (reports / "drift").mkdir()
+    _write(
+        reports / "drift" / "prod_1.json",
+        {**summary, "per_feature": {}},
+    )
     (reports / "drift" / "prod_1.html").write_text(
-        "<p>local drift report</p>", encoding="utf-8"
+        "<p>stale drift report</p>", encoding="utf-8"
     )
     return reports, site
 
@@ -118,10 +129,15 @@ def test_build_renders_joined_operating_evidence_before_default_comparison(tmp_p
         "pending",
         "n/a",
         "requires human approval",
+        "Evidently: failed",
+        "RuntimeError",
+        "report generation failed",
     ):
         assert expected in html
     assert (site / "figures" / "pr_curve.png").read_bytes() == b"local figure"
-    assert (site / "drift" / "prod_1.html").read_text(encoding="utf-8") == "<p>local drift report</p>"
+    assert (site / "drift" / "prod_1.json").exists()
+    assert 'href="drift/prod_1.json"' in html
+    assert 'href="drift/prod_1.html"' not in html
 
 
 def test_build_rejects_drift_and_decision_batch_mismatch(tmp_path):
@@ -136,12 +152,27 @@ def test_build_rejects_drift_and_decision_batch_mismatch(tmp_path):
         build(reports, site)
 
 
+def test_build_rejects_stale_native_batch_evidence(tmp_path):
+    reports, site = _evidence(tmp_path)
+    native_path = reports / "drift" / "prod_1.json"
+    native = json.loads(native_path.read_text(encoding="utf-8"))
+    native["batch_data_fingerprint"] = "c" * 64
+    _write(native_path, native)
+
+    with pytest.raises(ValueError, match="native per-batch drift evidence"):
+        build(reports, site)
+
+
 def test_build_renders_null_evidence_values_as_na(tmp_path):
     """Catches nullable evidence leaking as an exception or literal None."""
     reports, site = _evidence(tmp_path)
     summaries = json.loads((reports / "drift_summary.json").read_text(encoding="utf-8"))
     summaries[0]["n_rows"] = None
     _write(reports / "drift_summary.json", summaries)
+    native_path = reports / "drift" / "prod_1.json"
+    native = json.loads(native_path.read_text(encoding="utf-8"))
+    native["n_rows"] = None
+    _write(native_path, native)
     _write(
         reports / "run_manifest.json",
         {"data": {"source": None, "fingerprint_sha256": None}},

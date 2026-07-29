@@ -5,13 +5,13 @@ bad data), score it with the promoted model at the selected operating
 threshold, and persist predictions (proba + label, plus the true Class where
 available) for the drift/performance monitoring stage.
 """
-import json
 
 import pandas as pd
 
 from src import features
 from src.artifacts import load_model, load_threshold
-from src.config import REPORTS_DIR, batch_dir, load_params
+from src.config import batch_dir, load_params
+from src.evidence import sha256_file
 from src.validate import require_valid_dataframe
 
 
@@ -22,6 +22,7 @@ def score_batch(
     *,
     threshold: float,
     promoted_model_id: str,
+    batch_data_fingerprint: str,
 ) -> pd.DataFrame:
     contract = "labeled" if features.TARGET in df else "inference"
     require_valid_dataframe(
@@ -30,11 +31,13 @@ def score_batch(
         require_target_distribution=False,
     )
     proba = model.predict_proba(features.transform(df, scaler)[features.FEATURES])[:, 1]
-    out = df[["Time", "Amount"]].copy()
+    out = df[["Time", "Amount"]].copy().reset_index(drop=True)
+    out.insert(0, "row_position", range(len(out)))
     out["proba"] = proba
     out["pred"] = (proba >= threshold).astype(int)
     out["operating_threshold"] = float(threshold)
     out["promoted_model_id"] = promoted_model_id
+    out["batch_data_fingerprint"] = batch_data_fingerprint
     if features.TARGET in df:
         out[features.TARGET] = df[features.TARGET].values
     return out
@@ -44,20 +47,24 @@ def main() -> None:
     params = load_params()
     bdir = batch_dir(params)
     model, scaler = load_model(), features.load_scaler()
-    threshold = load_threshold()["threshold"]
-    promoted_model_id = json.loads(
-        (REPORTS_DIR / "promotion_record.json").read_text()
-    )["promoted_model_id"]
+    operating_point = load_threshold()
+    threshold = operating_point["threshold"]
+    promoted_model_id = operating_point["promoted_model_id"]
 
     for i in range(1, params["data"]["n_prod_batches"] + 1):
         name = f"prod_{i}"
-        df = pd.read_csv(bdir / f"{name}.csv")
+        source_path = bdir / f"{name}.csv"
+        batch_data_fingerprint = sha256_file(source_path)
+        df = pd.read_csv(source_path)
+        if sha256_file(source_path) != batch_data_fingerprint:
+            raise ValueError(f"{source_path} changed while being read")
         preds = score_batch(
             df,
             model,
             scaler,
             threshold=threshold,
             promoted_model_id=promoted_model_id,
+            batch_data_fingerprint=batch_data_fingerprint,
         )
         preds.to_csv(bdir / f"preds_{name}.csv", index=False)
         flagged = int(preds["pred"].sum())

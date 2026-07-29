@@ -14,6 +14,8 @@ the retraining trigger has no heavy dependency. A rich Evidently HTML report is
 additionally emitted per batch when Evidently is importable (best-effort).
 The per-batch summary JSON is the contract consumed by ``src.retrain_trigger``.
 """
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp
@@ -21,7 +23,7 @@ from scipy.stats import ks_2samp
 from src import features
 from src.artifacts import load_model
 from src.config import DRIFT_DIR, FIGURES_DIR, REPORTS_DIR, batch_dir, ensure_dirs, load_params
-from src.evidence import write_json
+from src.evidence import sha256_file, write_json
 from src.evaluate import compute_metrics
 
 
@@ -89,9 +91,18 @@ def summarize_batch(
     *,
     batch_name: str,
     threshold: float,
+    promoted_model_id: str,
+    batch_data_fingerprint: str,
     params: dict,
 ) -> dict:
     """Return native drift and, where available, label-based batch evidence."""
+    probability = _validate_prediction_contract(
+        current,
+        predictions,
+        threshold=threshold,
+        promoted_model_id=promoted_model_id,
+        batch_data_fingerprint=batch_data_fingerprint,
+    )
     drift = feature_drift(reference, current, params)
     labels_available = features.TARGET in predictions
     performance = None
@@ -99,7 +110,7 @@ def summarize_batch(
         costs = params["threshold"]
         performance = compute_metrics(
             predictions[features.TARGET],
-            predictions["proba"],
+            probability,
             threshold,
             cost_false_negative=costs["cost_false_negative"],
             cost_false_positive=costs["cost_false_positive"],
@@ -110,10 +121,13 @@ def summarize_batch(
         "batch": batch_name,
         "n_rows": len(current),
         "label_status": "available" if labels_available else "pending",
+        "promoted_model_id": promoted_model_id,
+        "operating_threshold": float(threshold),
+        "batch_data_fingerprint": batch_data_fingerprint,
         "pct_drifted_features": drift["pct_drifted_features"],
         "n_drifted": drift["n_drifted"],
         "amount_psi": drift["per_feature"]["Amount"]["psi"],
-        "prediction_psi": round(psi(reference_proba, predictions["proba"].to_numpy()), 4),
+        "prediction_psi": round(psi(reference_proba, probability), 4),
         "target_rate": target_rate,
         "baseline_target_rate": baseline_target_rate if labels_available else None,
         "target_rate_delta": target_rate - baseline_target_rate if labels_available else None,
@@ -127,9 +141,84 @@ def summarize_batch(
     }
 
 
+def _validate_prediction_contract(
+    current: pd.DataFrame,
+    predictions: pd.DataFrame,
+    *,
+    threshold: float,
+    promoted_model_id: str,
+    batch_data_fingerprint: str,
+) -> np.ndarray:
+    if len(predictions) != len(current):
+        raise ValueError(
+            "prediction row count does not match the current batch row count"
+        )
+    required = {
+        "row_position",
+        "Time",
+        "Amount",
+        "proba",
+        "pred",
+        "operating_threshold",
+        "promoted_model_id",
+        "batch_data_fingerprint",
+    }
+    missing = required - set(predictions)
+    if missing:
+        raise ValueError(f"prediction evidence is missing columns: {sorted(missing)}")
+    if not np.array_equal(
+        predictions["row_position"].to_numpy(), np.arange(len(current))
+    ):
+        raise ValueError("prediction row alignment does not match the current batch")
+    aligned_columns = ["Time", "Amount"]
+    current_labeled = features.TARGET in current
+    predictions_labeled = features.TARGET in predictions
+    if current_labeled != predictions_labeled:
+        raise ValueError("prediction row alignment does not match current Class labels")
+    if current_labeled:
+        aligned_columns.append(features.TARGET)
+    if any(
+        not np.array_equal(
+            current[column].to_numpy(), predictions[column].to_numpy()
+        )
+        for column in aligned_columns
+    ):
+        raise ValueError("prediction row alignment does not match the current batch")
+    if not bool(
+        len(predictions)
+        and predictions["operating_threshold"].eq(float(threshold)).all()
+    ):
+        raise ValueError("prediction operating threshold does not match")
+    if not bool(
+        len(predictions)
+        and predictions["promoted_model_id"].eq(promoted_model_id).all()
+    ):
+        raise ValueError("prediction promoted model does not match")
+    if not bool(
+        len(predictions)
+        and predictions["batch_data_fingerprint"].eq(
+            batch_data_fingerprint
+        ).all()
+    ):
+        raise ValueError("prediction batch data fingerprint does not match")
+    probability = pd.to_numeric(
+        predictions["proba"], errors="coerce"
+    ).to_numpy(dtype=float)
+    if not np.isfinite(probability).all():
+        raise ValueError("prediction evidence must contain finite probabilities")
+    prediction = pd.to_numeric(
+        predictions["pred"], errors="coerce"
+    ).to_numpy(dtype=float)
+    if not set(prediction).issubset({0.0, 1.0}):
+        raise ValueError("prediction evidence must contain binary predictions")
+    return probability
+
+
 def evidently_report(reference: pd.DataFrame, current: pd.DataFrame, path) -> dict:
     """Emit optional Evidently HTML without weakening native monitoring."""
+    target = Path(path)
     try:
+        target.unlink(missing_ok=True)
         from evidently import Report
         from evidently.presets import DataDriftPreset
 
@@ -139,9 +228,10 @@ def evidently_report(reference: pd.DataFrame, current: pd.DataFrame, path) -> di
         snapshot = Report([DataDriftPreset()]).run(
             reference_data=reference[columns], current_data=current[columns]
         )
-        snapshot.save_html(str(path))
+        snapshot.save_html(str(target))
         return {"status": "generated", "error_type": None, "message": None}
     except Exception as error:  # noqa: BLE001 - optional, never fatal
+        target.unlink(missing_ok=True)
         return {
             "status": "failed",
             "error_type": type(error).__name__,
@@ -157,7 +247,9 @@ def main() -> None:
 
     from src.artifacts import load_threshold
 
-    threshold = load_threshold()["threshold"]
+    operating_point = load_threshold()
+    threshold = operating_point["threshold"]
+    promoted_model_id = operating_point["promoted_model_id"]
     train = pd.read_csv(bdir / "train.csv")
     calibration = pd.read_csv(bdir / "calibration.csv")
     model, scaler = load_model(), features.load_scaler()
@@ -168,7 +260,11 @@ def main() -> None:
     summaries = []
     for i in range(1, params["data"]["n_prod_batches"] + 1):
         name = f"prod_{i}"
-        cur = pd.read_csv(bdir / f"{name}.csv")
+        source_path = bdir / f"{name}.csv"
+        batch_data_fingerprint = sha256_file(source_path)
+        cur = pd.read_csv(source_path)
+        if sha256_file(source_path) != batch_data_fingerprint:
+            raise ValueError(f"{source_path} changed while being read")
         preds = pd.read_csv(bdir / f"preds_{name}.csv")
 
         full_summary = summarize_batch(
@@ -178,6 +274,8 @@ def main() -> None:
             preds,
             batch_name=name,
             threshold=threshold,
+            promoted_model_id=promoted_model_id,
+            batch_data_fingerprint=batch_data_fingerprint,
             params=params,
         )
         full_summary["evidently"] = evidently_report(train, cur, DRIFT_DIR / f"{name}.html")
