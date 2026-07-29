@@ -57,9 +57,7 @@ stages:
       - data/batches/model_valid.csv
       - data/raw/creditcard.csv
       - data/raw/PROVENANCE.json
-    params:
-      - train
-      - threshold
+      - params.yaml
     outs:
       - models/model.joblib
       - models/scaler.joblib
@@ -126,6 +124,7 @@ stages:
       - src/features.py
       - src/validate.py
       - src/config.py
+      - src/evidence.py
       - models/model.joblib
       - models/scaler.joblib
       - models/threshold.json
@@ -162,6 +161,13 @@ stages:
     params:
       - drift
       - threshold
+    outs:
+      - reports/drift/prod_1.json:
+          cache: false
+      - reports/drift/prod_2.json:
+          cache: false
+      - reports/drift/prod_3.json:
+          cache: false
     metrics:
       - reports/drift_summary.json:
           cache: false

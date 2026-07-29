@@ -55,6 +55,8 @@ def test_dvc_graph_tracks_current_artifacts_and_no_retired_paths():
     }
     assert "data/raw/creditcard.csv" in stages["train"]["deps"]
     assert "data/raw/PROVENANCE.json" in stages["train"]["deps"]
+    assert "params.yaml" in stages["train"]["deps"]
+    assert "params" not in stages["train"]
     assert "reports/promotion_record.json" in stages["threshold"]["deps"]
     assert {
         "models/model.joblib", "models/scaler.joblib", "models/threshold.json",
@@ -65,6 +67,18 @@ def test_dvc_graph_tracks_current_artifacts_and_no_retired_paths():
         "data/batches/calibration.csv",
     }.issubset(stages["drift"]["deps"])
     assert "reports/operating_point.json" in stages["trigger"]["deps"]
+    assert "src/evidence.py" in stages["inference"]["deps"]
+    drift_outputs = {
+        path: options
+        for output in stages["drift"]["outs"]
+        for path, options in output.items()
+    }
+    assert {
+        "reports/drift/prod_1.json",
+        "reports/drift/prod_2.json",
+        "reports/drift/prod_3.json",
+    } == set(drift_outputs)
+    assert all(spec["cache"] is False for spec in drift_outputs.values())
     rendered = (ROOT / "dvc.yaml").read_text()
     assert "data/batches/valid.csv" not in rendered
     assert "baseline.json" not in rendered
