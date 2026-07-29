@@ -37,6 +37,7 @@ def build_model(name: str, params: dict, pos_weight: float):
     """Return an estimator for ``name``. Falls back to RandomForest if xgboost
     is unavailable, so the pipeline still runs anywhere (logged as a note)."""
     rs = params["train"]["random_state"]
+    n_jobs = params["train"]["n_jobs"]
     if name == "logistic_regression":
         return LogisticRegression(
             class_weight=params["train"]["class_weight"], max_iter=1000, random_state=rs
@@ -53,14 +54,17 @@ def build_model(name: str, params: dict, pos_weight: float):
                 scale_pos_weight=pos_weight,  # counter class imbalance
                 eval_metric="aucpr",
                 random_state=rs,
-                n_jobs=-1,
+                n_jobs=n_jobs,
             )
         except ImportError:
             from sklearn.ensemble import RandomForestClassifier
 
             print("[note] xgboost unavailable -> RandomForest fallback")
             return RandomForestClassifier(
-                n_estimators=300, class_weight="balanced_subsample", n_jobs=-1, random_state=rs
+                n_estimators=300,
+                class_weight="balanced_subsample",
+                n_jobs=n_jobs,
+                random_state=rs,
             )
     raise ValueError(f"unknown model {name}")
 
@@ -98,6 +102,7 @@ def log_candidate(
         mlflow.log_params(params)
         mlflow.log_param("model_name", name)
         mlflow.log_param("imbalance", metadata["imbalance"])
+        mlflow.log_param("n_jobs", metadata["n_jobs"])
         mlflow.log_param("cost_false_negative", metadata["cost_false_negative"])
         mlflow.log_param("cost_false_positive", metadata["cost_false_positive"])
         mlflow.set_tags(
@@ -163,6 +168,7 @@ def main() -> None:
         "data_fingerprint": sha256_file(raw_path),
         "parameter_fingerprint": sha256_file(ROOT / "params.yaml"),
         "imbalance": params["train"]["class_weight"],
+        "n_jobs": params["train"]["n_jobs"],
         "cost_false_negative": params["threshold"]["cost_false_negative"],
         "cost_false_positive": params["threshold"]["cost_false_positive"],
     }

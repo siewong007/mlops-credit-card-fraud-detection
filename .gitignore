@@ -18,3 +18,7 @@ reports/drift/*.html
 # Generated static dashboard (published to GitHub Pages by CI)
 site/
 data/raw/PROVENANCE.json
+/submission-private/
+/dist/
+/data.zip
+/MLOpsMaster_Final_Project_Briefing_Credit_Card_Fraud.docx

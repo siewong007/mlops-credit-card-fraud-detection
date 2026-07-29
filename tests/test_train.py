@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import joblib
 import mlflow
@@ -9,10 +10,35 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 from src.train import (
+    build_model,
     choose_promoted_candidate,
     log_candidate,
     register_winner,
 )
+
+
+def test_xgboost_and_fallback_use_configured_single_worker():
+    """Changing the configured worker count must affect every parallel estimator."""
+    params = {
+        "train": {
+            "class_weight": "balanced",
+            "random_state": 42,
+            "n_jobs": 1,
+        }
+    }
+    xgboost = build_model("xgboost", params, pos_weight=2.0)
+    assert xgboost.get_params()["n_jobs"] == 1
+
+    original_import = __import__
+
+    def no_xgboost(name, *args, **kwargs):
+        if name == "xgboost":
+            raise ImportError("test fallback")
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=no_xgboost):
+        fallback = build_model("xgboost", params, pos_weight=2.0)
+    assert fallback.get_params()["n_jobs"] == 1
 
 
 def test_choose_promoted_candidate_uses_pr_auc():
@@ -55,6 +81,7 @@ def test_candidate_run_is_registered_without_a_second_run(tmp_path):
             "data_fingerprint": "a" * 64,
             "parameter_fingerprint": "b" * 64,
             "imbalance": "balanced",
+            "n_jobs": 1,
             "cost_false_negative": 100,
             "cost_false_positive": 1,
         },
@@ -68,6 +95,7 @@ def test_candidate_run_is_registered_without_a_second_run(tmp_path):
     assert result["run_id"] == registered.run_id
     assert "estimator.C" in run.data.params
     assert run.data.params["imbalance"] == "balanced"
+    assert run.data.params["n_jobs"] == "1"
     assert run.data.params["cost_false_negative"] == "100"
     assert run.data.tags["source_provenance"] == "unit-test"
     assert run.data.tags["data_fingerprint"] == "a" * 64
