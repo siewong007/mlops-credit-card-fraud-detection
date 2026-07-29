@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+.worktrees/
 mlruns/
 mlartifacts/
 mlflow.db
