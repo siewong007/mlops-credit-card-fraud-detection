@@ -1,23 +1,28 @@
-"""Training + MLflow experiment tracking (Owner: B). Requirements 3, 7.
-
-Runs the configured experiments (>= 2: a Logistic Regression baseline and a
-gradient-boosted improvement), logging params, imbalance-aware metrics and the
-model artefact to MLflow for every run. The run with the best validation PR-AUC
-is *promoted*: its model + fraud-rate are written to ``models/`` (our stand-in
-for a model registry) and, where the tracking backend supports it, registered
-in the MLflow Model Registry.
-"""
+"""Training + traceable MLflow candidate promotion."""
 import json
 import os
+from pathlib import Path
+import tempfile
 
 import joblib
 import mlflow
 import mlflow.sklearn
+import numpy as np
 import pandas as pd
+from mlflow import MlflowClient
 from sklearn.linear_model import LogisticRegression
 
 from src import features
-from src.config import MODELS_DIR, ROOT, batch_dir, ensure_dirs, load_params
+from src.config import (
+    MODELS_DIR,
+    REPORTS_DIR,
+    ROOT,
+    batch_dir,
+    ensure_dirs,
+    load_params,
+    read_provenance,
+)
+from src.evidence import sha256_file, write_json
 from src.evaluate import compute_metrics
 
 EXPERIMENT = "fraud-detection"
@@ -26,7 +31,6 @@ EXPERIMENT = "fraud-detection"
 DEFAULT_TRACKING_URI = f"sqlite:///{ROOT / 'mlflow.db'}"
 REGISTERED_MODEL = "fraud-detector"
 _MODEL_PATH = MODELS_DIR / "model.joblib"
-_BASELINE_PATH = MODELS_DIR / "baseline.json"
 
 
 def build_model(name: str, params: dict, pos_weight: float):
@@ -61,55 +65,155 @@ def build_model(name: str, params: dict, pos_weight: float):
     raise ValueError(f"unknown model {name}")
 
 
+def normalise_mlflow_param(value) -> str | int | float | bool:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return "None" if value is None else value
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def log_candidate(
+    name,
+    model,
+    X_train,
+    y_train,
+    X_valid,
+    y_valid,
+    metadata,
+    scaler_path,
+) -> dict:
+    with mlflow.start_run(run_name=name) as run:
+        model.fit(X_train, y_train)
+        probability = model.predict_proba(X_valid)[:, 1]
+        metrics = compute_metrics(y_valid, probability, threshold=0.5)
+        params = {
+            f"estimator.{key}": normalise_mlflow_param(value)
+            for key, value in model.get_params(deep=False).items()
+        }
+        mlflow.log_params(params)
+        mlflow.log_param("model_name", name)
+        mlflow.log_param("imbalance", metadata["imbalance"])
+        mlflow.log_param("cost_false_negative", metadata["cost_false_negative"])
+        mlflow.log_param("cost_false_positive", metadata["cost_false_positive"])
+        mlflow.set_tags(
+            {
+                "source_provenance": metadata["source"],
+                "data_fingerprint": metadata["data_fingerprint"],
+                "parameter_fingerprint": metadata["parameter_fingerprint"],
+            }
+        )
+        mlflow.log_metrics(
+            {
+                f"model_validation.{key}": value
+                for key, value in metrics.items()
+                if isinstance(value, (int, float)) and np.isfinite(value)
+            }
+        )
+        mlflow.log_artifact(str(scaler_path), artifact_path="preprocessing")
+        model_info = mlflow.sklearn.log_model(
+            model, name="model", serialization_format="cloudpickle"
+        )
+        return {
+            "model_name": name,
+            "run_id": run.info.run_id,
+            "model_uri": model_info.model_uri,
+            "model_validation_metrics": metrics,
+            "model": model,
+        }
+
+
+def choose_promoted_candidate(candidates: list[dict]) -> dict:
+    return max(
+        candidates,
+        key=lambda candidate: candidate["model_validation_metrics"]["pr_auc"],
+    )
+
+
+def register_winner(
+    candidate: dict,
+    registered_model_name: str = REGISTERED_MODEL,
+) -> str:
+    registered = mlflow.register_model(candidate["model_uri"], registered_model_name)
+    client = MlflowClient()
+    version = str(registered.version)
+    client.set_registered_model_alias(registered_model_name, "champion", version)
+    return version
+
+
 def main() -> None:
     ensure_dirs()
     params = load_params()
     bdir = batch_dir(params)
     train = pd.read_csv(bdir / "train.csv")
-    valid = pd.read_csv(bdir / "valid.csv")
+    model_valid = pd.read_csv(bdir / "model_valid.csv")
 
     scaler = features.fit_scaler(train)
-    features.save_scaler(scaler)
     X_tr, y_tr = features.xy(features.transform(train, scaler))
-    X_va, y_va = features.xy(features.transform(valid, scaler))
+    X_model_valid, y_model_valid = features.xy(features.transform(model_valid, scaler))
     pos_weight = float((y_tr == 0).sum() / max((y_tr == 1).sum(), 1))
+    raw_path = ROOT / params["data"]["raw_path"]
+    provenance = read_provenance(params)
+    metadata = {
+        "source": json.dumps(provenance, sort_keys=True),
+        "data_fingerprint": sha256_file(raw_path),
+        "parameter_fingerprint": sha256_file(ROOT / "params.yaml"),
+        "imbalance": params["train"]["class_weight"],
+        "cost_false_negative": params["threshold"]["cost_false_negative"],
+        "cost_false_positive": params["threshold"]["cost_false_positive"],
+    }
 
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
     mlflow.set_experiment(EXPERIMENT)
-    results = []
-    for name in params["train"]["models"]:
-        with mlflow.start_run(run_name=name):
-            model = build_model(name, params, pos_weight)
-            model.fit(X_tr, y_tr)
-            proba = model.predict_proba(X_va)[:, 1]
-            metrics = compute_metrics(y_va, proba, threshold=0.5)
-            mlflow.log_param("model", name)
-            mlflow.log_params({k: params["train"][k] for k in ("class_weight", "random_state")})
-            mlflow.log_metrics(metrics)
-            mlflow.sklearn.log_model(model, name="model", serialization_format="cloudpickle")
-            print(f"{name:>20}: PR-AUC={metrics['pr_auc']:.4f} recall={metrics['recall']:.3f}")
-            results.append((name, metrics, model))
-
-    # Promote the best run by validation PR-AUC.
-    best_name, best_metrics, best_model = max(results, key=lambda r: r[1]["pr_auc"])
-    joblib.dump(best_model, _MODEL_PATH)
-    _BASELINE_PATH.write_text(
-        json.dumps(
-            {"model": best_name, "pos_weight": pos_weight, "valid_at_0.5": best_metrics}, indent=2
-        )
-    )
-    print(f"promoted: {best_name} (valid PR-AUC {best_metrics['pr_auc']:.4f}) -> {_MODEL_PATH}")
-
-    # Best-effort registry (file-store backends may not support it).
-    try:
-        with mlflow.start_run(run_name=f"promote-{best_name}"):
-            info = mlflow.sklearn.log_model(
-                best_model, name="model", registered_model_name=REGISTERED_MODEL,
-                serialization_format="cloudpickle",
+    with tempfile.TemporaryDirectory() as staging_dir:
+        staged_scaler = Path(staging_dir) / "scaler.joblib"
+        joblib.dump(scaler, staged_scaler)
+        candidates = [
+            log_candidate(
+                name,
+                build_model(name, params, pos_weight),
+                X_tr,
+                y_tr,
+                X_model_valid,
+                y_model_valid,
+                metadata,
+                staged_scaler,
             )
-        print(f"registered '{REGISTERED_MODEL}' <- {info.model_uri}")
-    except Exception as e:  # noqa: BLE001 - registry is a nice-to-have, never fatal
-        print(f"[note] MLflow registry skipped ({type(e).__name__}); promoted bundle in models/")
+            for name in params["train"]["models"]
+        ]
+        winner = choose_promoted_candidate(candidates)
+        version = register_winner(winner)
+
+    joblib.dump(winner["model"], _MODEL_PATH)
+    features.save_scaler(scaler)
+    comparison = {
+        "selection_metric": "model_validation.pr_auc",
+        "candidates": [
+            {
+                **{key: value for key, value in candidate.items() if key != "model"},
+                "promoted": candidate["run_id"] == winner["run_id"],
+            }
+            for candidate in candidates
+        ],
+        "promoted_run_id": winner["run_id"],
+    }
+    promotion = {
+        "promoted_model_id": f"{REGISTERED_MODEL}:v{version}",
+        "model_name": winner["model_name"],
+        "mlflow_run_id": winner["run_id"],
+        "registered_model_name": REGISTERED_MODEL,
+        "registered_model_version": version,
+        "model_validation_metrics": winner["model_validation_metrics"],
+        "source_provenance": provenance,
+        "data_fingerprint": metadata["data_fingerprint"],
+        "parameter_fingerprint": metadata["parameter_fingerprint"],
+        "selection_reason": "highest model-validation PR-AUC",
+    }
+    write_json(REPORTS_DIR / "experiment_comparison.json", comparison)
+    write_json(REPORTS_DIR / "promotion_record.json", promotion)
+    print(
+        f"promoted: {winner['model_name']} "
+        f"(model-validation PR-AUC {winner['model_validation_metrics']['pr_auc']:.4f}) "
+        f"-> {_MODEL_PATH}"
+    )
 
 
 if __name__ == "__main__":
