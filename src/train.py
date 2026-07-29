@@ -84,7 +84,13 @@ def log_candidate(
     with mlflow.start_run(run_name=name) as run:
         model.fit(X_train, y_train)
         probability = model.predict_proba(X_valid)[:, 1]
-        metrics = compute_metrics(y_valid, probability, threshold=0.5)
+        metrics = compute_metrics(
+            y_valid,
+            probability,
+            threshold=0.5,
+            cost_false_negative=metadata["cost_false_negative"],
+            cost_false_positive=metadata["cost_false_positive"],
+        )
         params = {
             f"estimator.{key}": normalise_mlflow_param(value)
             for key, value in model.get_params(deep=False).items()

@@ -121,7 +121,13 @@ def main() -> None:
         preds = pd.read_csv(bdir / f"preds_{name}.csv")
 
         fd = feature_drift(train, cur, params)
-        perf = compute_metrics(preds[features.TARGET], preds["proba"], threshold=threshold)
+        perf = compute_metrics(
+            preds[features.TARGET],
+            preds["proba"],
+            threshold=threshold,
+            cost_false_negative=params["threshold"]["cost_false_negative"],
+            cost_false_positive=params["threshold"]["cost_false_positive"],
+        )
         summary = {
             "batch": name,
             "n_rows": len(cur),
