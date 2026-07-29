@@ -93,9 +93,11 @@ def check_dataframe(
 
     target_present = "Class" in df.columns
     required = LABELED_COLUMNS if contract == "labeled" or target_present else FEATURE_COLUMNS
-    schema = LABELED_SCHEMA if contract == "labeled" or target_present else INFERENCE_SCHEMA
+    pandera_contract = (
+        LABELED_SCHEMA if contract == "labeled" or target_present else INFERENCE_SCHEMA
+    )
     try:
-        schema.validate(df, lazy=True)
+        pandera_contract.validate(df, lazy=True)
         schema_passed = True
         schema_details = ""
     except (pa.errors.SchemaError, pa.errors.SchemaErrors) as error:
