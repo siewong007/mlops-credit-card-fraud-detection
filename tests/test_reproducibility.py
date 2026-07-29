@@ -101,9 +101,19 @@ def test_dvc_graph_tracks_current_artifacts_and_no_retired_paths():
     graph = yaml.safe_load((ROOT / "dvc.yaml").read_text())
     stages = graph["stages"]
     assert set(stages) == {
-        "data", "validate", "ingest", "train", "threshold", "evaluate",
+        "validate", "ingest", "train", "threshold", "evaluate",
         "inference", "drift", "trigger",
     }
+    # DVC erases a stage's outputs before running it, so declaring the raw
+    # dataset as an output would destroy a real, unrecoverable ULB CSV on repro.
+    produced = {
+        path
+        for stage in stages.values()
+        for output in stage.get("outs", [])
+        for path in ([output] if isinstance(output, str) else output)
+    }
+    assert not any(path.startswith("data/raw/") for path in produced)
+    assert "data/raw/creditcard.csv" in stages["validate"]["deps"]
     assert "data/raw/creditcard.csv" in stages["train"]["deps"]
     assert "data/raw/PROVENANCE.json" in stages["train"]["deps"]
     assert "params.yaml" in stages["train"]["deps"]
@@ -133,6 +143,20 @@ def test_dvc_graph_tracks_current_artifacts_and_no_retired_paths():
     rendered = (ROOT / "dvc.yaml").read_text()
     assert "data/batches/valid.csv" not in rendered
     assert "baseline.json" not in rendered
+
+
+def test_clean_clone_verifier_fails_when_repro_does_not_converge():
+    """Plain `dvc status` exits 0 on drift, so the gate needs the --quiet form."""
+    script = (ROOT / "scripts" / "verify_dvc_clean_clone.sh").read_text()
+    commands = [line.strip() for line in script.splitlines()]
+    ordered = [
+        "python -m src.simulate_data",  # seeds the graph's raw input
+        "python -m dvc repro",
+        "python -m dvc status --quiet",  # plain `dvc status` never exits non-zero
+    ]
+    positions = [commands.index(command) for command in ordered]
+    assert positions == sorted(positions)
+    assert "set -euo pipefail" in commands
 
 
 def test_dvc_metadata_has_no_configured_remote():

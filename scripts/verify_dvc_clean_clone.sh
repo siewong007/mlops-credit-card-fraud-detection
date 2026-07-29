@@ -41,8 +41,15 @@ git -C "$repo_root" archive "$source_commit" | tar -x -C "$scratch/repo"
   git add --all
   git commit --quiet -m "isolated verification snapshot"
   export SOURCE_COMMIT="$source_commit"
+  # Seed the graph's raw input. The snapshot carries no CSV (data/raw is
+  # gitignored), so this only ever writes inside the disposable clone.
+  python -m src.simulate_data
   python -m dvc repro
+  # Plain `dvc status` always exits 0, so it reports drift without ever failing
+  # the gate; it runs first only to put the readable diff in the log. `--quiet`
+  # is the form that exits 1 when the pipeline is not up to date after repro.
   python -m dvc status
+  python -m dvc status --quiet
   python -m src.evidence
   python -m src.build_dashboard
   if [[ -f tests/test_evidence_consistency.py ]]; then
