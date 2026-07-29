@@ -75,6 +75,10 @@ def _metric(value, digits=3) -> str:
     return "n/a" if value is None else f"{value:.{digits}f}"
 
 
+def _count(value) -> str:
+    return "n/a" if value is None else f"{value:,}"
+
+
 def _badge(status: str) -> str:
     label, css = _BADGE[status]
     return f'<span class="badge {css}">{escape(label)}</span>'
@@ -120,7 +124,7 @@ def build(
     data = manifest["data"]
     rows = "\n".join(
         f"<tr><td><code>{escape(summary['batch'])}</code></td>"
-        f"<td>{summary['n_rows']:,}</td><td>{_metric(summary['pr_auc'])}</td>"
+        f"<td>{_count(summary['n_rows'])}</td><td>{_metric(summary['pr_auc'])}</td>"
         f"<td>{_metric(summary['recall'])}</td><td>{_metric(summary['precision'])}</td>"
         f"<td>{_metric(summary['pct_drifted_features'], 1)}%</td>"
         f"<td>{_metric(summary['amount_psi'])}</td><td>{_metric(summary['prediction_psi'])}</td>"

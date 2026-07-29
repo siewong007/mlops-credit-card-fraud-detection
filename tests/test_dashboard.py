@@ -139,6 +139,9 @@ def test_build_rejects_drift_and_decision_batch_mismatch(tmp_path):
 def test_build_renders_null_evidence_values_as_na(tmp_path):
     """Catches nullable evidence leaking as an exception or literal None."""
     reports, site = _evidence(tmp_path)
+    summaries = json.loads((reports / "drift_summary.json").read_text(encoding="utf-8"))
+    summaries[0]["n_rows"] = None
+    _write(reports / "drift_summary.json", summaries)
     _write(
         reports / "run_manifest.json",
         {"data": {"source": None, "fingerprint_sha256": None}},
@@ -148,6 +151,7 @@ def test_build_renders_null_evidence_values_as_na(tmp_path):
 
     html = (site / "index.html").read_text(encoding="utf-8")
     assert "None" not in html
+    assert "<code>prod_1</code></td><td>n/a</td>" in html
     assert html.count("n/a") >= 5
 
 
