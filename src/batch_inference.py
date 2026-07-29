@@ -10,7 +10,7 @@ import pandas as pd
 from src import features
 from src.artifacts import load_model, load_threshold
 from src.config import batch_dir, load_params
-from src.validate import schema
+from src.validate import LABELED_SCHEMA
 
 
 def score_batch(df: pd.DataFrame, model, scaler, threshold: float) -> pd.DataFrame:
@@ -32,7 +32,7 @@ def main() -> None:
     for i in range(1, params["data"]["n_prod_batches"] + 1):
         name = f"prod_{i}"
         df = pd.read_csv(bdir / f"{name}.csv")
-        schema.validate(df)  # requirement 6: reject malformed batches before scoring
+        LABELED_SCHEMA.validate(df)  # requirement 6: reject malformed batches before scoring
         preds = score_batch(df, model, scaler, threshold)
         preds.to_csv(bdir / f"preds_{name}.csv", index=False)
         flagged = int(preds["pred"].sum())
