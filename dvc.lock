@@ -156,6 +156,10 @@ stages:
       hash: md5
       md5: a6a4a40cef6949dcd101debf8e5548c7
       size: 45291259
+    - path: params.yaml
+      hash: md5
+      md5: 0c2c9237961f0a1f94ab6f72fc6f92d5
+      size: 1876
     - path: src/config.py
       hash: md5
       md5: 1feada43f632faace39521b2890b1c08
@@ -176,18 +180,6 @@ stages:
       hash: md5
       md5: 1a948294ed5b988df2b37a0650128c96
       size: 8078
-    params:
-      params.yaml:
-        threshold:
-          cost_false_negative: 100
-          cost_false_positive: 1
-        train:
-          models:
-          - logistic_regression
-          - xgboost
-          class_weight: balanced
-          random_state: 42
-          n_jobs: 1
     outs:
     - path: models/model.joblib
       hash: md5
@@ -199,11 +191,11 @@ stages:
       size: 879
     - path: reports/experiment_comparison.json
       hash: md5
-      md5: 4f233fa2d322cb9df0612b9f0e983b21
+      md5: b0e5c95814d1813c22e9aedde2a80ae7
       size: 1445
     - path: reports/promotion_record.json
       hash: md5
-      md5: ebaf850531d1a7d0f2ba957249345b83
+      md5: 43ee43f999793ffa15da1e1a6f492571
       size: 1045
   threshold:
     cmd: python -m src.threshold
@@ -222,7 +214,7 @@ stages:
       size: 879
     - path: reports/promotion_record.json
       hash: md5
-      md5: ebaf850531d1a7d0f2ba957249345b83
+      md5: 43ee43f999793ffa15da1e1a6f492571
       size: 1045
     - path: src/artifacts.py
       hash: md5
@@ -363,7 +355,7 @@ stages:
       size: 593
     - path: reports/promotion_record.json
       hash: md5
-      md5: ebaf850531d1a7d0f2ba957249345b83
+      md5: 43ee43f999793ffa15da1e1a6f492571
       size: 1045
     - path: src/artifacts.py
       hash: md5
@@ -377,6 +369,10 @@ stages:
       hash: md5
       md5: 1feada43f632faace39521b2890b1c08
       size: 2192
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
     - path: src/features.py
       hash: md5
       md5: 31406612dd28fa69d1c009c852896d6e
@@ -482,6 +478,18 @@ stages:
           cost_false_negative: 100
           cost_false_positive: 1
     outs:
+    - path: reports/drift/prod_1.json
+      hash: md5
+      md5: d9cd41fc93911c038a9c90faea00fc8a
+      size: 3296
+    - path: reports/drift/prod_2.json
+      hash: md5
+      md5: f44f8d7ef7996bf60ce8c42b5b824d57
+      size: 3330
+    - path: reports/drift/prod_3.json
+      hash: md5
+      md5: 6c5252dce91e11e738ff5f0e698f583b
+      size: 3267
     - path: reports/drift_summary.json
       hash: md5
       md5: dba227b67296c320a615dc8ec515b6ed
