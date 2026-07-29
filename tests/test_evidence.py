@@ -43,6 +43,31 @@ def test_provenance_writer_rejects_non_strict_json(tmp_path, monkeypatch):
     assert not config.provenance_path(params).exists()
 
 
+def test_synthetic_provenance_omits_volatile_generation_timestamp(tmp_path, monkeypatch):
+    """Synthetic lineage must be byte-stable for the same generated data."""
+    monkeypatch.setattr(config, "ROOT", tmp_path)
+    params = {"data": {"raw_path": "data/raw/creditcard.csv"}}
+
+    config.write_provenance(
+        params,
+        "SYNTHETIC — unit test",
+        rows=10,
+        fraud=1,
+        include_generated_at=False,
+    )
+    first = config.provenance_path(params).read_text()
+    config.write_provenance(
+        params,
+        "SYNTHETIC — unit test",
+        rows=10,
+        fraud=1,
+        include_generated_at=False,
+    )
+
+    assert config.provenance_path(params).read_text() == first
+    assert "generated_at" not in json.loads(first)
+
+
 def test_exact_requirement_parser_rejects_ranges_and_unpinned_lines(tmp_path):
     """Catches accepting a direct dependency without one exact version."""
     exact = tmp_path / "exact.txt"
