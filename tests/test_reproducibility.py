@@ -7,6 +7,53 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_runtime_versions_and_docker_contract_are_exact():
+    """A floating image or dependency can change verification without a commit."""
+    requirements = (ROOT / "requirements.txt").read_text().splitlines()
+    direct_dependencies = [
+        line.strip()
+        for line in requirements
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert all("==" in line for line in direct_dependencies)
+    assert "dvc==3.67.1" in direct_dependencies
+    assert "pyarrow==21.0.0" in direct_dependencies
+
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    assert (
+        "FROM python:3.13.9-slim@sha256:"
+        "326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86"
+    ) in dockerfile
+    assert "ARG SOURCE_COMMIT" in dockerfile
+    assert "SOURCE_COMMIT=${SOURCE_COMMIT}" in dockerfile
+    assert "apt-get install -y --no-install-recommends make" in dockerfile
+    assert "pip install --no-cache-dir -r requirements.txt" in dockerfile
+    for setting in (
+        "MPLBACKEND=Agg",
+        "DISABLE_PANDERA_IMPORT_WARNING=True",
+        "PYTHONUNBUFFERED=1",
+    ):
+        assert setting in dockerfile
+    assert 'CMD ["make", "verify"]' in dockerfile
+
+    ignored = (ROOT / ".dockerignore").read_text().splitlines()
+    for path in (
+        ".git",
+        ".superpowers",
+        "data/raw/*",
+        "data/batches/*",
+        "models/",
+        "site/",
+        "reports/",
+        "mlruns/",
+        "mlartifacts/",
+        "mlflow.db",
+        "submission-private/",
+        "dist/",
+    ):
+        assert path in ignored
+
+
 def test_make_verify_has_required_gate_order():
     """Removing a pipeline dependency must break the verification command order."""
     result = subprocess.run(
