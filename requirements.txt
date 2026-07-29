@@ -14,4 +14,7 @@ pytest==8.4.2
 matplotlib==3.10.6
 pyyaml==6.0.3
 # Data/artefact versioning (optional for running the pipeline; used by dvc.yaml).
-dvc>=3.50,<4
+dvc==3.67.1
+# Required to read the OpenML Parquet source in src.fetch_data. MLflow 3.14.0
+# requires pyarrow<25, so 21.0.0 is the compatible verified direct pin.
+pyarrow==21.0.0
