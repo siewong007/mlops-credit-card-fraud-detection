@@ -173,42 +173,6 @@ def run_decision_stage() -> dict:
     return report
 
 
-# Temporary compatibility bridge for src.build_dashboard. Task 9 migrates the
-# dashboard to the structured decision payload and removes these two helpers.
-def decide(baseline_pr_auc: float, batch: dict, params: dict) -> str:
-    """Legacy dashboard status helper; use evaluate_batch for new consumers."""
-    t = params["trigger"]
-    drop = 100 * (baseline_pr_auc - batch["pr_auc"]) / baseline_pr_auc
-    if drop > t["pr_auc_drop_pct"] or batch["recall"] < t["recall_floor"]:
-        return "retrain"
-    if batch["pct_drifted_features"] > t["drifted_features_pct"]:
-        return "retrain"
-    if batch["pct_drifted_features"] > t["drifted_features_pct"] / 2:
-        return "warning"
-    return "ok"
-
-
-def _reasons(baseline_pr_auc: float, batch: dict, params: dict) -> str:
-    """Legacy dashboard reasons helper; use evaluate_batch for new consumers."""
-    t = params["trigger"]
-    drop = 100 * (baseline_pr_auc - batch["pr_auc"]) / baseline_pr_auc
-    out = []
-    if drop > t["pr_auc_drop_pct"]:
-        out.append(f"PR-AUC drop {drop:.0f}% > {t['pr_auc_drop_pct']}%")
-    if batch["recall"] < t["recall_floor"]:
-        out.append(f"recall {batch['recall']:.2f} < floor {t['recall_floor']}")
-    if batch["pct_drifted_features"] > t["drifted_features_pct"]:
-        out.append(
-            f"{batch['pct_drifted_features']:.0f}% features drifted > "
-            f"{t['drifted_features_pct']}%"
-        )
-    elif batch["pct_drifted_features"] > t["drifted_features_pct"] / 2:
-        out.append(
-            f"{batch['pct_drifted_features']:.0f}% features drifted (warning band)"
-        )
-    return "; ".join(out) or "within all thresholds"
-
-
 def main(argv=None) -> None:
     """Run the stage, or print a workflow annotation from an existing report."""
     import argparse
