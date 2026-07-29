@@ -9,20 +9,38 @@ from src.config import ROOT, batch_dir, load_params
 
 _SIGNAL_COMPONENTS = [4, 10, 11, 12, 14, 17]  # kept in sync with simulate_data
 
+SPLIT_NAMES = (
+    "train",
+    "model_valid",
+    "calibration",
+    "prod_1",
+    "prod_2",
+    "prod_3",
+)
+
 
 def split_by_time(df: pd.DataFrame, params: dict) -> dict[str, pd.DataFrame]:
-    """Sort by Time; return train / valid / prod_1..N slices (disjoint, ordered)."""
-    df = df.sort_values("Time").reset_index(drop=True)
-    n = len(df)
-    p = params["data"]
-    t_end = int(n * p["train_frac"])
-    v_end = t_end + int(n * p["valid_frac"])
-    out = {"train": df.iloc[:t_end], "valid": df.iloc[t_end:v_end]}
-    prod = df.iloc[v_end:]
-    k = p["n_prod_batches"]
-    for i in range(k):
-        out[f"prod_{i + 1}"] = prod.iloc[i * len(prod) // k : (i + 1) * len(prod) // k]
-    return out
+    """Return six stable time-ordered, disjoint slices that preserve every row."""
+    ordered = df.sort_values("Time", kind="stable").reset_index(drop=True)
+    n_rows = len(ordered)
+    data_params = params["data"]
+    train_end = int(n_rows * data_params["train_frac"])
+    model_valid_end = train_end + int(n_rows * data_params["model_valid_frac"])
+    calibration_end = model_valid_end + int(n_rows * data_params["calibration_frac"])
+    parts = {
+        "train": ordered.iloc[:train_end],
+        "model_valid": ordered.iloc[train_end:model_valid_end],
+        "calibration": ordered.iloc[model_valid_end:calibration_end],
+    }
+    production = ordered.iloc[calibration_end:]
+    n_batches = data_params["n_prod_batches"]
+    for index in range(n_batches):
+        start = index * len(production) // n_batches
+        end = (index + 1) * len(production) // n_batches
+        parts[f"prod_{index + 1}"] = production.iloc[start:end]
+    if tuple(parts) != SPLIT_NAMES or sum(map(len, parts.values())) != n_rows:
+        raise ValueError("six-way split did not preserve the complete dataset")
+    return {name: frame.copy().reset_index(drop=True) for name, frame in parts.items()}
 
 
 def inject_drift(batch: pd.DataFrame, params: dict) -> pd.DataFrame:

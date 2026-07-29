@@ -1,21 +1,53 @@
 import numpy as np
 import pandas as pd
 
-from src.ingest import inject_drift, split_by_time
+from src.ingest import SPLIT_NAMES, inject_drift, split_by_time
 
-PARAMS = {"data": {"train_frac": 0.5, "valid_frac": 0.2, "n_prod_batches": 3}}
+PARAMS = {
+    "data": {
+        "train_frac": 0.5,
+        "model_valid_frac": 0.1,
+        "calibration_frac": 0.1,
+        "n_prod_batches": 3,
+    }
+}
+
+EXPECTED_SPLIT_NAMES = (
+    "train",
+    "model_valid",
+    "calibration",
+    "prod_1",
+    "prod_2",
+    "prod_3",
+)
 
 
 def _df(n=100):
-    return pd.DataFrame({"Time": range(n), "Class": [0] * n})
+    return pd.DataFrame(
+        {
+            "row_id": np.arange(n),
+            "Time": np.repeat(np.arange((n + 1) // 2), 2)[:n],
+            "Class": 0,
+        }
+    )
 
 
-def test_split_is_time_ordered_and_disjoint():
-    parts = split_by_time(_df(), PARAMS)
-    assert set(parts) == {"train", "valid", "prod_1", "prod_2", "prod_3"}
-    assert sum(len(p) for p in parts.values()) == 100
-    assert parts["train"]["Time"].max() < parts["valid"]["Time"].min()
-    assert parts["valid"]["Time"].max() < parts["prod_1"]["Time"].min()
+def test_split_has_six_chronological_disjoint_slices():
+    parts = split_by_time(_df(100).sample(frac=1, random_state=4), PARAMS)
+    assert SPLIT_NAMES == EXPECTED_SPLIT_NAMES
+    assert tuple(parts) == SPLIT_NAMES
+    assert [len(parts[name]) for name in SPLIT_NAMES] == [50, 10, 10, 10, 10, 10]
+    joined = pd.concat(parts.values(), ignore_index=True)
+    assert len(joined) == 100
+    assert joined["row_id"].is_unique
+    assert joined["Time"].is_monotonic_increasing
+
+
+def test_split_preserves_remainder_rows():
+    parts = split_by_time(_df(103), PARAMS)
+    assert sum(map(len, parts.values())) == 103
+    production_sizes = [len(parts[f"prod_{i}"]) for i in range(1, 4)]
+    assert max(production_sizes) - min(production_sizes) <= 1
 
 
 def test_inject_drift_shifts_amount_and_signal_features():
