@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.13.9"
           cache: pip
       - run: pip install -r requirements.txt
 
@@ -40,11 +40,20 @@ jobs:
         continue-on-error: true
         run: python -m src.fetch_data
 
-      - name: Run pipeline (ingest -> ... -> retraining trigger)
-        run: make pipeline
+      - name: Run verified monitoring simulation
+        run: SOURCE_COMMIT="$GITHUB_SHA" make verify
 
-      - name: Build monitoring dashboard
-        run: make dashboard
+      - name: Parse structured review decision
+        id: decision
+        run: |
+          python -m src.retrain_trigger \
+            --github-annotation reports/trigger_decisions.json
+          status="$(python -c 'import json; print(json.load(open("reports/trigger_decisions.json"))["overall_status"])')"
+          case "$status" in
+            ok|warning|retrain) ;;
+            *) echo "Unknown monitoring status: $status" >&2; exit 1 ;;
+          esac
+          echo "overall_status=$status" >> "$GITHUB_OUTPUT"
 
       - name: Publish decision to run summary
         run: |
@@ -57,26 +66,21 @@ jobs:
               echo "Dataset: **synthetic fallback** (OpenML fetch failed)"
             fi
             echo
+            echo "Overall status: **${{ steps.decision.outputs.overall_status }}**"
+            echo
             cat reports/trigger_log.md
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Flag retraining decision
-        run: |
-          if grep -qi 'retrain' reports/trigger_log.md; then
-            echo "::warning title=Retraining trigger fired::At least one batch met the retrain criteria — see the run summary and dashboard."
-          fi
-
-      - name: Upload evidence
-        if: always()
+      - name: Upload successful evidence
         uses: actions/upload-artifact@v4
         with:
           name: monitoring-evidence
           path: |
-            reports/metrics_valid.json
-            reports/drift_summary.json
+            reports/*.json
             reports/trigger_log.md
             reports/figures/**
             reports/drift/**
+            site/**
 
       - uses: actions/upload-pages-artifact@v3
         with:
