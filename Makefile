@@ -1,4 +1,5 @@
-.PHONY: fetch-data data ingest validate train threshold evaluate inference drift trigger dashboard test pipeline clean
+.PHONY: fetch-data data validate ingest train threshold evaluate inference drift \
+	trigger manifest pipeline dashboard test-fast test verify verify-dvc clean
 
 # Download the REAL ULB dataset from OpenML (no Kaggle account needed).
 # Run this once locally to work with real data.
@@ -11,29 +12,49 @@ fetch-data:
 data:
 	@test -f data/raw/creditcard.csv || python -m src.simulate_data
 
-ingest: data
-	python -m src.ingest
-validate:
+validate: data
 	python -m src.validate
-train:
-	python -m src.train
-threshold:
-	python -m src.threshold
-evaluate:
-	python -m src.evaluate
-inference:
-	python -m src.batch_inference
-drift:
-	python -m src.drift
-trigger:
-	python -m src.retrain_trigger
-dashboard:
-	python -m src.build_dashboard
-test:
-	python -m pytest
 
-# Full reorganised workflow, in dependency order.
-pipeline: ingest validate train threshold evaluate inference drift trigger
+ingest: validate
+	python -m src.ingest
+
+train: ingest
+	python -m src.train
+
+threshold: train
+	python -m src.threshold
+
+evaluate: threshold
+	python -m src.evaluate
+
+inference: evaluate
+	python -m src.batch_inference
+
+drift: inference
+	python -m src.drift
+
+trigger: drift
+	python -m src.retrain_trigger
+
+manifest: trigger
+	python -m src.evidence
+
+pipeline: manifest
+
+dashboard: manifest
+	python -m src.build_dashboard
+
+test-fast:
+	python -m pytest -q -m "not integration"
+
+test:
+	python -m pytest -q -ra
+
+verify: dashboard
+	python -m pytest -q -ra
+
+verify-dvc:
+	scripts/verify_dvc_clean_clone.sh
 
 clean:
 	rm -rf models site reports/drift reports/*.json reports/trigger_log.md \

@@ -31,6 +31,7 @@ def test_choose_promoted_candidate_uses_pr_auc():
     assert choose_promoted_candidate(candidates)["model_name"] == "second"
 
 
+@pytest.mark.integration
 def test_candidate_run_is_registered_without_a_second_run(tmp_path):
     """Registration must use the logged candidate model and preserve its run ID."""
     tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
