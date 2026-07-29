@@ -85,12 +85,10 @@ def build_operating_point(
 
 
 def main() -> None:
-    import pandas as pd
-
     from src import features
     from src.artifacts import load_model, save_operating_point
     from src.config import FIGURES_DIR, REPORTS_DIR, batch_dir, ensure_dirs, load_params
-    from src.evidence import sha256_file
+    from src.validate import read_stable_csv
     import json
 
     ensure_dirs()
@@ -99,7 +97,7 @@ def main() -> None:
     c_fp = params["threshold"]["cost_false_positive"]
 
     calibration_path = batch_dir(params) / "calibration.csv"
-    calibration = pd.read_csv(calibration_path)
+    calibration, calibration_data_fingerprint = read_stable_csv(calibration_path)
     model, scaler = load_model(), features.load_scaler()
     X, y = features.xy(features.transform(calibration, scaler))
     proba = model.predict_proba(X)[:, 1]
@@ -110,7 +108,7 @@ def main() -> None:
         cost_false_negative=c_fn,
         cost_false_positive=c_fp,
         promotion_record=json.loads((REPORTS_DIR / "promotion_record.json").read_text()),
-        calibration_data_fingerprint=sha256_file(calibration_path),
+        calibration_data_fingerprint=calibration_data_fingerprint,
     )
     save_operating_point(operating_point)
     _plot_tradeoff(

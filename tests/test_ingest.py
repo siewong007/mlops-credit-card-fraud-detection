@@ -3,7 +3,9 @@ import pandas as pd
 import pytest
 
 from src import ingest
+from src.evidence import sha256_file
 from src.ingest import SPLIT_NAMES, inject_drift, split_by_time
+from src.validate import DataValidationError
 
 PARAMS = {
     "data": {
@@ -95,3 +97,43 @@ def test_main_gates_the_exact_raw_path_and_split_params(tmp_path, monkeypatch):
 
     with pytest.raises(GateObserved):
         ingest.main()
+
+
+def test_main_writes_no_batches_when_raw_changes_during_read(
+    tmp_path, monkeypatch
+):
+    raw_path = tmp_path / "data/raw/source.csv"
+    raw_path.parent.mkdir(parents=True)
+    _df(100).to_csv(raw_path, index=False)
+    expected_digest = sha256_file(raw_path)
+    output_dir = tmp_path / "data/batches"
+    params = {
+        "data": {
+            **PARAMS["data"],
+            "raw_path": "data/raw/source.csv",
+            "batch_dir": "data/batches",
+        }
+    }
+    real_read_csv = pd.read_csv
+
+    def read_then_mutate(path, *args, **kwargs):
+        frame = real_read_csv(path, *args, **kwargs)
+        if path == raw_path:
+            mutated = frame.copy()
+            mutated.loc[0, "row_id"] = 999
+            mutated.to_csv(raw_path, index=False)
+        return frame
+
+    monkeypatch.setattr(ingest, "ROOT", tmp_path)
+    monkeypatch.setattr(ingest, "load_params", lambda: params)
+    monkeypatch.setattr(ingest, "batch_dir", lambda supplied: output_dir)
+    monkeypatch.setattr(
+        "src.validate.require_validation_gate",
+        lambda raw, supplied: {"raw_data_fingerprint": expected_digest},
+    )
+    monkeypatch.setattr("src.validate.pd.read_csv", read_then_mutate)
+
+    with pytest.raises(DataValidationError, match="changed while being read"):
+        ingest.main()
+
+    assert not output_dir.exists()

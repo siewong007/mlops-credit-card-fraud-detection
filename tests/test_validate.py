@@ -1,4 +1,5 @@
 import json
+import hashlib
 from copy import deepcopy
 
 import numpy as np
@@ -8,6 +9,7 @@ import pytest
 from src.validate import (
     DataValidationError,
     check_dataframe,
+    read_stable_csv,
     require_valid_dataframe,
     require_validation_gate,
     validate_file,
@@ -39,6 +41,40 @@ def _valid_frame():
     frame["Class"] = 0
     frame.loc[[10, 510, 610], "Class"] = 1
     return frame
+
+
+def test_stable_csv_read_returns_verified_digest(tmp_path):
+    path = tmp_path / "data.csv"
+    path.write_text("value\n1\n", encoding="utf-8")
+
+    frame, digest = read_stable_csv(path)
+
+    assert frame["value"].tolist() == [1]
+    assert digest == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_stable_csv_read_rejects_expected_fingerprint_mismatch(tmp_path):
+    path = tmp_path / "data.csv"
+    path.write_text("value\n1\n", encoding="utf-8")
+
+    with pytest.raises(DataValidationError, match="expected SHA-256"):
+        read_stable_csv(path, expected_sha256="0" * 64)
+
+
+def test_stable_csv_read_rejects_mutation_during_read(tmp_path, monkeypatch):
+    path = tmp_path / "data.csv"
+    path.write_text("value\n1\n", encoding="utf-8")
+    real_read_csv = pd.read_csv
+
+    def read_then_mutate(source, *args, **kwargs):
+        frame = real_read_csv(source, *args, **kwargs)
+        path.write_text("value\n2\n", encoding="utf-8")
+        return frame
+
+    monkeypatch.setattr("src.validate.pd.read_csv", read_then_mutate)
+
+    with pytest.raises(DataValidationError, match="changed while being read"):
+        read_stable_csv(path)
 
 
 def test_labeled_contract_checks_distribution_and_finite_values():

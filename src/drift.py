@@ -23,8 +23,9 @@ from scipy.stats import ks_2samp
 from src import features
 from src.artifacts import load_model
 from src.config import DRIFT_DIR, FIGURES_DIR, REPORTS_DIR, batch_dir, ensure_dirs, load_params
-from src.evidence import sha256_file, write_json
+from src.evidence import write_json
 from src.evaluate import compute_metrics
+from src.validate import read_stable_csv
 
 
 def psi(reference: np.ndarray, current: np.ndarray, bins: int = 10) -> float:
@@ -251,7 +252,10 @@ def main() -> None:
     threshold = operating_point["threshold"]
     promoted_model_id = operating_point["promoted_model_id"]
     train = pd.read_csv(bdir / "train.csv")
-    calibration = pd.read_csv(bdir / "calibration.csv")
+    calibration, _ = read_stable_csv(
+        bdir / "calibration.csv",
+        expected_sha256=operating_point["calibration_data_fingerprint"],
+    )
     model, scaler = load_model(), features.load_scaler()
     ref_proba = model.predict_proba(
         features.transform(calibration, scaler)[features.FEATURES]
@@ -261,10 +265,7 @@ def main() -> None:
     for i in range(1, params["data"]["n_prod_batches"] + 1):
         name = f"prod_{i}"
         source_path = bdir / f"{name}.csv"
-        batch_data_fingerprint = sha256_file(source_path)
-        cur = pd.read_csv(source_path)
-        if sha256_file(source_path) != batch_data_fingerprint:
-            raise ValueError(f"{source_path} changed while being read")
+        cur, batch_data_fingerprint = read_stable_csv(source_path)
         preds = pd.read_csv(bdir / f"preds_{name}.csv")
 
         full_summary = summarize_batch(

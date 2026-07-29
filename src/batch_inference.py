@@ -11,8 +11,7 @@ import pandas as pd
 from src import features
 from src.artifacts import load_model, load_threshold
 from src.config import batch_dir, load_params
-from src.evidence import sha256_file
-from src.validate import require_valid_dataframe
+from src.validate import read_stable_csv, require_valid_dataframe
 
 
 def score_batch(
@@ -54,10 +53,7 @@ def main() -> None:
     for i in range(1, params["data"]["n_prod_batches"] + 1):
         name = f"prod_{i}"
         source_path = bdir / f"{name}.csv"
-        batch_data_fingerprint = sha256_file(source_path)
-        df = pd.read_csv(source_path)
-        if sha256_file(source_path) != batch_data_fingerprint:
-            raise ValueError(f"{source_path} changed while being read")
+        df, batch_data_fingerprint = read_stable_csv(source_path)
         preds = score_batch(
             df,
             model,

@@ -198,6 +198,31 @@ def require_valid_dataframe(
     return df
 
 
+def read_stable_csv(
+    path: str | Path,
+    *,
+    expected_sha256: str | None = None,
+) -> tuple[pd.DataFrame, str]:
+    """Read one CSV whose bytes stay stable and optionally match an expected SHA."""
+    try:
+        before = sha256_file(path)
+        if expected_sha256 is not None and before != expected_sha256:
+            raise DataValidationError(
+                f"{path} does not match expected SHA-256"
+            )
+        frame = pd.read_csv(path)
+        after = sha256_file(path)
+    except DataValidationError:
+        raise
+    except Exception as error:
+        raise DataValidationError(f"could not read stable CSV {path}: {error}") from error
+    if before != after:
+        raise DataValidationError(f"{path} changed while being read")
+    if expected_sha256 is not None and after != expected_sha256:
+        raise DataValidationError(f"{path} does not match expected SHA-256")
+    return frame, before
+
+
 def validate_file(
     path: str | Path,
     params: dict,
@@ -209,11 +234,12 @@ def validate_file(
     split_parameter_fingerprint = _split_parameter_fingerprint(params)
     raw_data_fingerprint = None
     try:
-        raw_data_fingerprint = sha256_file(path)
-        raw = pd.read_csv(path)
-        if sha256_file(path) != raw_data_fingerprint:
-            raise OSError("raw data changed while being read")
+        raw, raw_data_fingerprint = read_stable_csv(path)
     except Exception as error:
+        try:
+            raw_data_fingerprint = sha256_file(path)
+        except OSError:
+            raw_data_fingerprint = None
         details = f"raw CSV read failed: {error}"
         payload = {
             "overall_status": "failed",

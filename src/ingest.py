@@ -70,12 +70,15 @@ def inject_drift(batch: pd.DataFrame, params: dict) -> pd.DataFrame:
 
 
 def main() -> None:
-    from src.validate import require_validation_gate
+    from src.validate import read_stable_csv, require_validation_gate
 
     params = load_params()
     raw_path = ROOT / params["data"]["raw_path"]
-    require_validation_gate(raw_path, params)
-    df = pd.read_csv(raw_path)
+    report = require_validation_gate(raw_path, params)
+    df, _ = read_stable_csv(
+        raw_path,
+        expected_sha256=report["raw_data_fingerprint"],
+    )
     parts = split_by_time(df, params)
 
     inject = params["data"].get("inject_drift", False)

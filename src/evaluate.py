@@ -103,20 +103,22 @@ def _plot_pr_curve(y_true, proba, path) -> None:
 
 
 def main() -> None:
-    import pandas as pd
-
     from src import features
     from src.artifacts import load_model, load_threshold
     from src.config import FIGURES_DIR, REPORTS_DIR, batch_dir, ensure_dirs, load_params
     from src.evidence import write_json
+    from src.validate import read_stable_csv
 
     ensure_dirs()
     params = load_params()
-    calibration = pd.read_csv(batch_dir(params) / "calibration.csv")
+    operating_point = load_threshold()
+    calibration, _ = read_stable_csv(
+        batch_dir(params) / "calibration.csv",
+        expected_sha256=operating_point["calibration_data_fingerprint"],
+    )
     model, scaler = load_model(), features.load_scaler()
     X, y = features.xy(features.transform(calibration, scaler))
     proba = model.predict_proba(X)[:, 1]
-    operating_point = load_threshold()
     default_metrics, operating_metrics = evaluate_probabilities(y, proba, operating_point)
 
     print(f"Calibration operating metrics (threshold={operating_point['threshold']:.2f}):")

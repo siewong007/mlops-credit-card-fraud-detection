@@ -7,8 +7,10 @@ import pytest
 
 from src import features
 from src import drift
+from src import artifacts
 from src.drift import evidently_report, feature_drift, psi, summarize_batch
 from src.evidence import sha256_file
+from src.validate import DataValidationError
 
 PARAMS = {"drift": {"psi_threshold": 0.2, "ks_pvalue": 0.05}}
 MODEL_ID = "fraud-detector:v2"
@@ -275,7 +277,13 @@ def test_main_rejects_current_batch_mutation_while_reading(tmp_path, monkeypatch
     monkeypatch.setattr(drift.features, "load_scaler", lambda: scaler)
     monkeypatch.setattr(
         "src.artifacts.load_threshold",
-        lambda: {"threshold": 0.5, "promoted_model_id": MODEL_ID},
+        lambda: {
+            "threshold": 0.5,
+            "promoted_model_id": MODEL_ID,
+            "calibration_data_fingerprint": sha256_file(
+                bdir / "calibration.csv"
+            ),
+        },
     )
     monkeypatch.setattr(drift, "ensure_dirs", lambda: None)
     monkeypatch.setattr(drift, "evidently_report", lambda *args: {
@@ -287,6 +295,45 @@ def test_main_rejects_current_batch_mutation_while_reading(tmp_path, monkeypatch
     monkeypatch.setattr(drift.pd, "read_csv", read_then_mutate)
 
     with pytest.raises(ValueError, match="changed while being read"):
+        drift.main()
+
+
+def test_main_rejects_calibration_outside_operating_point(tmp_path, monkeypatch):
+    bdir = tmp_path / "batches"
+    bdir.mkdir()
+    rng = np.random.RandomState(19)
+    _frame(rng, n=20).to_csv(bdir / "train.csv", index=False)
+    _frame(rng, n=20).to_csv(bdir / "calibration.csv", index=False)
+    monkeypatch.setattr(
+        drift,
+        "load_params",
+        lambda: {
+            "data": {"n_prod_batches": 1},
+            "drift": {"psi_threshold": 0.2},
+            "threshold": {
+                "cost_false_negative": 100,
+                "cost_false_positive": 1,
+            },
+        },
+    )
+    monkeypatch.setattr(drift, "batch_dir", lambda params: bdir)
+    monkeypatch.setattr(drift, "ensure_dirs", lambda: None)
+    monkeypatch.setattr(
+        artifacts,
+        "load_threshold",
+        lambda: {
+            "threshold": 0.5,
+            "promoted_model_id": MODEL_ID,
+            "calibration_data_fingerprint": "0" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        drift,
+        "load_model",
+        lambda: (_ for _ in ()).throw(AssertionError("model must not load")),
+    )
+
+    with pytest.raises(DataValidationError, match="expected SHA-256"):
         drift.main()
 
 
