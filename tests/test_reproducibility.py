@@ -43,7 +43,6 @@ def test_runtime_versions_and_docker_contract_are_exact():
     ignored = (ROOT / ".dockerignore").read_text().splitlines()
     for path in (
         ".git",
-        ".superpowers",
         "data/raw/*",
         "data/batches/*",
         "models/",

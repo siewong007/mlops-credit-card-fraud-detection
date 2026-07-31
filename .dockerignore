@@ -1,6 +1,5 @@
 # Source-control and local environments
 .git
-.superpowers
 .venv/
 venv/
 __pycache__/
