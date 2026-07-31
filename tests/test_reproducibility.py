@@ -189,7 +189,7 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
     )
     assert named["Fast unit tests"]["run"] == "make test-fast"
     assert named["DVC clean-clone reproduction"]["run"].splitlines() == [
-        'export DVC_REPRO_EXPORT_DIR="$RUNNER_TEMP/dvc-repro"',
+        'export DVC_REPRO_EXPORT_DIR="$GITHUB_WORKSPACE/dvc-repro"',
         "make verify-dvc",
     ]
     assert named["Complete verification"]["run"] == (
@@ -201,6 +201,7 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
 
     upload = named["Upload successful evidence"]
     assert "if" not in upload
+    uploaded = set(upload["with"]["path"].splitlines())
     assert {
         "reports/*.json",
         "reports/trigger_log.md",
@@ -211,8 +212,11 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
         "dvc.lock",
         "params.yaml",
         "requirements.txt",
-        "${{ runner.temp }}/dvc-repro/**",
-    } == set(upload["with"]["path"].splitlines())
+        "dvc-repro/**",
+    } == uploaded
+    # An absolute path raises the artifact's least common ancestor above the
+    # workspace, burying the evidence under /home/runner/work.
+    assert not any(path.startswith(("/", "$", "${{")) for path in uploaded)
 
     docker_named = {
         step["name"]: step for step in jobs["docker"]["steps"] if "name" in step

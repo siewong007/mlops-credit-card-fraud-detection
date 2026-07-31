@@ -18,6 +18,8 @@ reports/drift/*.html
 # Generated static dashboard (published to GitHub Pages by CI)
 site/
 data/raw/PROVENANCE.json
+# Clean-clone reproduction export, written into the workspace by CI
+/dvc-repro/
 /submission-private/
 /dist/
 /data.zip
