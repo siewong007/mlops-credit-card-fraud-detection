@@ -36,6 +36,26 @@ def _df(n=100):
     )
 
 
+@pytest.mark.parametrize("n_batches", [1, 2, 4, 5])
+def test_split_honours_a_configured_production_batch_count(n_batches):
+    """params.yaml documents n_prod_batches as a knob; catches it being locked to 3."""
+    params = {"data": {**PARAMS["data"], "n_prod_batches": n_batches}}
+
+    parts = split_by_time(_df(100), params)
+
+    assert tuple(parts) == ingest.split_names(n_batches)
+    assert len(parts) == 3 + n_batches
+    assert sum(len(frame) for frame in parts.values()) == 100
+
+
+def test_split_rejects_a_production_batch_count_below_one():
+    """Catches a ZeroDivisionError instead of an actionable configuration error."""
+    params = {"data": {**PARAMS["data"], "n_prod_batches": 0}}
+
+    with pytest.raises(ValueError, match="n_prod_batches must be at least 1"):
+        split_by_time(_df(100), params)
+
+
 def test_split_has_six_chronological_disjoint_slices():
     parts = split_by_time(_df(100).sample(frac=1, random_state=4), PARAMS)
     assert SPLIT_NAMES == EXPECTED_SPLIT_NAMES

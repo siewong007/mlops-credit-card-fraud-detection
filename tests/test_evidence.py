@@ -1,6 +1,7 @@
 import importlib.metadata
 import json
 import platform
+import subprocess
 
 import pytest
 
@@ -189,6 +190,27 @@ def test_manifest_counts_a_dataset_that_carries_no_provenance(tmp_path, monkeypa
         "fraud_rate": round(1 / 3, 6),
         "fingerprint_sha256": sha256_file(raw),
     }
+
+
+def test_empty_environment_source_commit_falls_back_to_head(monkeypatch):
+    """`ARG SOURCE_COMMIT` with no --build-arg bakes in "" — unset, not invalid."""
+    monkeypatch.setenv("SOURCE_COMMIT", "")
+    monkeypatch.setattr("src.evidence._head_commit", lambda: "c" * 40)
+
+    assert _source_commit(None) == "c" * 40
+
+
+def test_unreachable_repository_explains_how_to_supply_the_commit(monkeypatch):
+    """Catches a bare CalledProcessError where the image excludes .git."""
+    monkeypatch.delenv("SOURCE_COMMIT", raising=False)
+
+    def _no_repo(*args, **kwargs):
+        raise subprocess.CalledProcessError(128, "git")
+
+    monkeypatch.setattr("src.evidence.subprocess.run", _no_repo)
+
+    with pytest.raises(ValueError, match="--build-arg SOURCE_COMMIT"):
+        _source_commit(None)
 
 
 def test_explicit_empty_source_commit_does_not_defer_to_environment(monkeypatch):

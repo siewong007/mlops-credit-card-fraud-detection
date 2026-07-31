@@ -1,4 +1,5 @@
 import json
+import platform
 import re
 from pathlib import Path
 
@@ -117,7 +118,11 @@ def test_generated_evidence_is_internally_consistent():
         assert native["label_status"] == summary["label_status"]
         assert native["evidently"] == summary["evidently"]
 
-    assert manifest["python_version"] == "3.13.9"
+    # The manifest must honestly record the interpreter that produced this
+    # evidence. That the *pinned* runtime is 3.13.9 is asserted against the
+    # Dockerfile and both workflows in tests/test_reproducibility.py, so this
+    # does not have to fail on a contributor's differing patch release.
+    assert manifest["python_version"] == platform.python_version()
     for fingerprint in (
         validation["raw_data_fingerprint"],
         manifest["data"]["fingerprint_sha256"],

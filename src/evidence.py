@@ -70,8 +70,20 @@ def installed_direct_dependencies(path: Path) -> dict[str, str]:
 
 
 def _source_commit(explicit: str | None) -> str:
-    commit = explicit if explicit is not None else os.environ.get("SOURCE_COMMIT")
-    if commit is None:
+    if explicit is not None:
+        commit = explicit
+    else:
+        # `ARG SOURCE_COMMIT` with no --build-arg bakes in an empty string, which
+        # is unset rather than invalid; an explicit "" is still an error.
+        commit = os.environ.get("SOURCE_COMMIT", "").strip() or _head_commit()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("source commit must be a full 40-character SHA")
+    return commit
+
+
+def _head_commit() -> str:
+    """Read HEAD, explaining the fix when no repository is reachable."""
+    try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=ROOT,
@@ -79,10 +91,13 @@ def _source_commit(explicit: str | None) -> str:
             capture_output=True,
             text=True,
         )
-        commit = result.stdout.strip()
-    if not re.fullmatch(r"[0-9a-f]{40}", commit):
-        raise ValueError("source commit must be a full 40-character SHA")
-    return commit
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ValueError(
+            "cannot determine the source commit: no git repository is reachable "
+            "(the Docker image excludes .git). Set the SOURCE_COMMIT environment "
+            "variable, or build with --build-arg SOURCE_COMMIT=$(git rev-parse HEAD)."
+        ) from error
+    return result.stdout.strip()
 
 
 def _data_evidence(params: dict) -> dict:

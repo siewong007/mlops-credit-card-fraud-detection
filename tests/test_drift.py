@@ -27,13 +27,14 @@ def _frame(rng, shift_amount=0.0, shift_v1=0.0, n=3000):
 
 
 def _predictions(frame, labeled=True):
+    proba = np.linspace(0.01, 0.99, len(frame))
     out = pd.DataFrame(
         {
             "row_position": np.arange(len(frame)),
             "Time": frame["Time"].to_numpy(),
             "Amount": frame["Amount"].to_numpy(),
-            "proba": np.linspace(0.01, 0.99, len(frame)),
-            "pred": np.zeros(len(frame), dtype=int),
+            "proba": proba,
+            "pred": (proba >= 0.5).astype(int),
             "operating_threshold": 0.5,
             "promoted_model_id": MODEL_ID,
             "batch_data_fingerprint": BATCH_FINGERPRINT,
@@ -216,6 +217,29 @@ def test_summary_rejects_non_binary_predictions():
     predictions.loc[0, "pred"] = 2
 
     with pytest.raises(ValueError, match="binary predictions"):
+        _summarize(reference, current, predictions)
+
+
+def test_summary_rejects_probabilities_edited_away_from_their_labels():
+    """Catches tampered evidence: binary and finite, but not what the threshold gives."""
+    rng = np.random.RandomState(19)
+    reference = _frame(rng, n=20)
+    current = _frame(rng, n=10)
+    predictions = _predictions(current)
+    predictions.loc[0, "proba"] = 0.99  # label stays 0, threshold is 0.5
+
+    with pytest.raises(ValueError, match="do not match the operating threshold"):
+        _summarize(reference, current, predictions)
+
+
+def test_summary_rejects_labels_edited_away_from_their_probabilities():
+    rng = np.random.RandomState(23)
+    reference = _frame(rng, n=20)
+    current = _frame(rng, n=10)
+    predictions = _predictions(current)
+    predictions.loc[0, "pred"] = 1  # proba 0.01 cannot produce a positive label
+
+    with pytest.raises(ValueError, match="do not match the operating threshold"):
         _summarize(reference, current, predictions)
 
 

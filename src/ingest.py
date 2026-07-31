@@ -9,18 +9,24 @@ from src.config import ROOT, batch_dir, load_params
 
 _SIGNAL_COMPONENTS = [4, 10, 11, 12, 14, 17]  # kept in sync with simulate_data
 
-SPLIT_NAMES = (
-    "train",
-    "model_valid",
-    "calibration",
-    "prod_1",
-    "prod_2",
-    "prod_3",
-)
+DEVELOPMENT_SPLIT_NAMES = ("train", "model_valid", "calibration")
+
+
+def split_names(n_prod_batches: int) -> tuple[str, ...]:
+    """Return the ordered slice names for ``n_prod_batches`` production batches."""
+    return (
+        *DEVELOPMENT_SPLIT_NAMES,
+        *(f"prod_{index}" for index in range(1, n_prod_batches + 1)),
+    )
+
+
+# The default configuration; `split_names` is the source of truth for any other
+# `n_prod_batches`, which params.yaml documents as configurable.
+SPLIT_NAMES = split_names(3)
 
 
 def split_by_time(df: pd.DataFrame, params: dict) -> dict[str, pd.DataFrame]:
-    """Return six stable time-ordered, disjoint slices that preserve every row."""
+    """Return stable time-ordered, disjoint slices that preserve every row."""
     ordered = df.sort_values("Time", kind="stable").reset_index(drop=True)
     n_rows = len(ordered)
     data_params = params["data"]
@@ -34,12 +40,17 @@ def split_by_time(df: pd.DataFrame, params: dict) -> dict[str, pd.DataFrame]:
     }
     production = ordered.iloc[calibration_end:]
     n_batches = data_params["n_prod_batches"]
+    if n_batches < 1:
+        raise ValueError(f"n_prod_batches must be at least 1, got {n_batches}")
     for index in range(n_batches):
         start = index * len(production) // n_batches
         end = (index + 1) * len(production) // n_batches
         parts[f"prod_{index + 1}"] = production.iloc[start:end]
-    if tuple(parts) != SPLIT_NAMES or sum(map(len, parts.values())) != n_rows:
-        raise ValueError("six-way split did not preserve the complete dataset")
+    expected = split_names(n_batches)
+    if tuple(parts) != expected:
+        raise ValueError(f"split produced {tuple(parts)}, expected {expected}")
+    if sum(map(len, parts.values())) != n_rows:
+        raise ValueError("time split did not preserve the complete dataset")
     return {name: frame.copy().reset_index(drop=True) for name, frame in parts.items()}
 
 

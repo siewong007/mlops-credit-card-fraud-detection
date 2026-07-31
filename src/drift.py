@@ -212,6 +212,13 @@ def _validate_prediction_contract(
     ).to_numpy(dtype=float)
     if not set(prediction).issubset({0.0, 1.0}):
         raise ValueError("prediction evidence must contain binary predictions")
+    # Binary and finite is not enough: labels must be the ones this threshold
+    # actually produces, or edited probabilities pass the contract unnoticed.
+    if not np.array_equal(prediction, (probability >= float(threshold)).astype(float)):
+        raise ValueError(
+            "prediction labels do not match the operating threshold applied to "
+            "the recorded probabilities"
+        )
     return probability
 
 
