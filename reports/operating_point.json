@@ -1,0 +1,25 @@
+{
+  "calibration_data_fingerprint": "1955adeff60672c5a4568c7d28bdd99ec50ccdf9e6e148a1afe90f393609a5c2",
+  "calibration_metrics": {
+    "estimated_business_cost": 666.0,
+    "f1": 0.3333333333333333,
+    "false_negative_rate": 0.25,
+    "false_positive_rate": 0.0023193702558335677,
+    "fn": 6,
+    "fp": 66,
+    "pr_auc": 0.6033066337523458,
+    "precision": 0.21428571428571427,
+    "recall": 0.75,
+    "roc_auc": 0.9492154554399774,
+    "threshold": 0.98,
+    "tn": 28390,
+    "tp": 18
+  },
+  "cost_assumptions": {
+    "false_negative": 100.0,
+    "false_positive": 1.0
+  },
+  "estimated_business_cost": 666.0,
+  "promoted_model_id": "fraud-detector:v1",
+  "threshold": 0.98
+}

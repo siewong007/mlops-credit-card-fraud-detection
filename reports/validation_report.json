@@ -1,0 +1,655 @@
+{
+  "datasets": {
+    "calibration": {
+      "checks": [
+        {
+          "details": "",
+          "name": "pandera_schema",
+          "passed": true
+        },
+        {
+          "details": "expected ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27', 'V28', 'Amount', 'Class']",
+          "name": "complete_column_set",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "numeric_and_finite",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "no_nulls",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "non_negative_time_and_amount",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "binary_target",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "both_target_classes",
+          "passed": true
+        },
+        {
+          "details": "required range is 0 < fraud_rate <= 0.05",
+          "name": "fraud_rate_in_range",
+          "passed": true
+        }
+      ],
+      "columns": [
+        "Time",
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V9",
+        "V10",
+        "V11",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22",
+        "V23",
+        "V24",
+        "V25",
+        "V26",
+        "V27",
+        "V28",
+        "Amount",
+        "Class"
+      ],
+      "contract": "labeled",
+      "dtypes": {
+        "Amount": "float64",
+        "Class": "int64",
+        "Time": "float64",
+        "V1": "float64",
+        "V10": "float64",
+        "V11": "float64",
+        "V12": "float64",
+        "V13": "float64",
+        "V14": "float64",
+        "V15": "float64",
+        "V16": "float64",
+        "V17": "float64",
+        "V18": "float64",
+        "V19": "float64",
+        "V2": "float64",
+        "V20": "float64",
+        "V21": "float64",
+        "V22": "float64",
+        "V23": "float64",
+        "V24": "float64",
+        "V25": "float64",
+        "V26": "float64",
+        "V27": "float64",
+        "V28": "float64",
+        "V3": "float64",
+        "V4": "float64",
+        "V5": "float64",
+        "V6": "float64",
+        "V7": "float64",
+        "V8": "float64",
+        "V9": "float64"
+      },
+      "fraud_count": 24,
+      "fraud_rate": 0.0008426966292134832,
+      "null_counts": {
+        "Amount": 0,
+        "Class": 0,
+        "Time": 0,
+        "V1": 0,
+        "V10": 0,
+        "V11": 0,
+        "V12": 0,
+        "V13": 0,
+        "V14": 0,
+        "V15": 0,
+        "V16": 0,
+        "V17": 0,
+        "V18": 0,
+        "V19": 0,
+        "V2": 0,
+        "V20": 0,
+        "V21": 0,
+        "V22": 0,
+        "V23": 0,
+        "V24": 0,
+        "V25": 0,
+        "V26": 0,
+        "V27": 0,
+        "V28": 0,
+        "V3": 0,
+        "V4": 0,
+        "V5": 0,
+        "V6": 0,
+        "V7": 0,
+        "V8": 0,
+        "V9": 0
+      },
+      "ranges": {
+        "Amount": {
+          "max": 7766.6,
+          "min": 0.0
+        },
+        "Class": {
+          "max": 1.0,
+          "min": 0.0
+        },
+        "Time": {
+          "max": 132928.0,
+          "min": 120396.0
+        }
+      },
+      "row_count": 28480,
+      "status": "passed"
+    },
+    "model_valid": {
+      "checks": [
+        {
+          "details": "",
+          "name": "pandera_schema",
+          "passed": true
+        },
+        {
+          "details": "expected ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27', 'V28', 'Amount', 'Class']",
+          "name": "complete_column_set",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "numeric_and_finite",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "no_nulls",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "non_negative_time_and_amount",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "binary_target",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "both_target_classes",
+          "passed": true
+        },
+        {
+          "details": "required range is 0 < fraud_rate <= 0.05",
+          "name": "fraud_rate_in_range",
+          "passed": true
+        }
+      ],
+      "columns": [
+        "Time",
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V9",
+        "V10",
+        "V11",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22",
+        "V23",
+        "V24",
+        "V25",
+        "V26",
+        "V27",
+        "V28",
+        "Amount",
+        "Class"
+      ],
+      "contract": "labeled",
+      "dtypes": {
+        "Amount": "float64",
+        "Class": "int64",
+        "Time": "float64",
+        "V1": "float64",
+        "V10": "float64",
+        "V11": "float64",
+        "V12": "float64",
+        "V13": "float64",
+        "V14": "float64",
+        "V15": "float64",
+        "V16": "float64",
+        "V17": "float64",
+        "V18": "float64",
+        "V19": "float64",
+        "V2": "float64",
+        "V20": "float64",
+        "V21": "float64",
+        "V22": "float64",
+        "V23": "float64",
+        "V24": "float64",
+        "V25": "float64",
+        "V26": "float64",
+        "V27": "float64",
+        "V28": "float64",
+        "V3": "float64",
+        "V4": "float64",
+        "V5": "float64",
+        "V6": "float64",
+        "V7": "float64",
+        "V8": "float64",
+        "V9": "float64"
+      },
+      "fraud_count": 91,
+      "fraud_rate": 0.0031952247191011237,
+      "null_counts": {
+        "Amount": 0,
+        "Class": 0,
+        "Time": 0,
+        "V1": 0,
+        "V10": 0,
+        "V11": 0,
+        "V12": 0,
+        "V13": 0,
+        "V14": 0,
+        "V15": 0,
+        "V16": 0,
+        "V17": 0,
+        "V18": 0,
+        "V19": 0,
+        "V2": 0,
+        "V20": 0,
+        "V21": 0,
+        "V22": 0,
+        "V23": 0,
+        "V24": 0,
+        "V25": 0,
+        "V26": 0,
+        "V27": 0,
+        "V28": 0,
+        "V3": 0,
+        "V4": 0,
+        "V5": 0,
+        "V6": 0,
+        "V7": 0,
+        "V8": 0,
+        "V9": 0
+      },
+      "ranges": {
+        "Amount": {
+          "max": 18910.0,
+          "min": 0.0
+        },
+        "Class": {
+          "max": 1.0,
+          "min": 0.0
+        },
+        "Time": {
+          "max": 120396.0,
+          "min": 84692.0
+        }
+      },
+      "row_count": 28480,
+      "status": "passed"
+    },
+    "raw": {
+      "checks": [
+        {
+          "details": "",
+          "name": "pandera_schema",
+          "passed": true
+        },
+        {
+          "details": "expected ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27', 'V28', 'Amount', 'Class']",
+          "name": "complete_column_set",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "numeric_and_finite",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "no_nulls",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "non_negative_time_and_amount",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "binary_target",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "both_target_classes",
+          "passed": true
+        },
+        {
+          "details": "required range is 0 < fraud_rate <= 0.05",
+          "name": "fraud_rate_in_range",
+          "passed": true
+        }
+      ],
+      "columns": [
+        "Time",
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V9",
+        "V10",
+        "V11",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22",
+        "V23",
+        "V24",
+        "V25",
+        "V26",
+        "V27",
+        "V28",
+        "Amount",
+        "Class"
+      ],
+      "contract": "labeled",
+      "dtypes": {
+        "Amount": "float64",
+        "Class": "int64",
+        "Time": "float64",
+        "V1": "float64",
+        "V10": "float64",
+        "V11": "float64",
+        "V12": "float64",
+        "V13": "float64",
+        "V14": "float64",
+        "V15": "float64",
+        "V16": "float64",
+        "V17": "float64",
+        "V18": "float64",
+        "V19": "float64",
+        "V2": "float64",
+        "V20": "float64",
+        "V21": "float64",
+        "V22": "float64",
+        "V23": "float64",
+        "V24": "float64",
+        "V25": "float64",
+        "V26": "float64",
+        "V27": "float64",
+        "V28": "float64",
+        "V3": "float64",
+        "V4": "float64",
+        "V5": "float64",
+        "V6": "float64",
+        "V7": "float64",
+        "V8": "float64",
+        "V9": "float64"
+      },
+      "fraud_count": 492,
+      "fraud_rate": 0.001727485630620034,
+      "null_counts": {
+        "Amount": 0,
+        "Class": 0,
+        "Time": 0,
+        "V1": 0,
+        "V10": 0,
+        "V11": 0,
+        "V12": 0,
+        "V13": 0,
+        "V14": 0,
+        "V15": 0,
+        "V16": 0,
+        "V17": 0,
+        "V18": 0,
+        "V19": 0,
+        "V2": 0,
+        "V20": 0,
+        "V21": 0,
+        "V22": 0,
+        "V23": 0,
+        "V24": 0,
+        "V25": 0,
+        "V26": 0,
+        "V27": 0,
+        "V28": 0,
+        "V3": 0,
+        "V4": 0,
+        "V5": 0,
+        "V6": 0,
+        "V7": 0,
+        "V8": 0,
+        "V9": 0
+      },
+      "ranges": {
+        "Amount": {
+          "max": 25691.16,
+          "min": 0.0
+        },
+        "Class": {
+          "max": 1.0,
+          "min": 0.0
+        },
+        "Time": {
+          "max": 172792.0,
+          "min": 0.0
+        }
+      },
+      "row_count": 284807,
+      "status": "passed"
+    },
+    "train": {
+      "checks": [
+        {
+          "details": "",
+          "name": "pandera_schema",
+          "passed": true
+        },
+        {
+          "details": "expected ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27', 'V28', 'Amount', 'Class']",
+          "name": "complete_column_set",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "numeric_and_finite",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "no_nulls",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "non_negative_time_and_amount",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "binary_target",
+          "passed": true
+        },
+        {
+          "details": "",
+          "name": "both_target_classes",
+          "passed": true
+        },
+        {
+          "details": "required range is 0 < fraud_rate <= 0.05",
+          "name": "fraud_rate_in_range",
+          "passed": true
+        }
+      ],
+      "columns": [
+        "Time",
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V9",
+        "V10",
+        "V11",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22",
+        "V23",
+        "V24",
+        "V25",
+        "V26",
+        "V27",
+        "V28",
+        "Amount",
+        "Class"
+      ],
+      "contract": "labeled",
+      "dtypes": {
+        "Amount": "float64",
+        "Class": "int64",
+        "Time": "float64",
+        "V1": "float64",
+        "V10": "float64",
+        "V11": "float64",
+        "V12": "float64",
+        "V13": "float64",
+        "V14": "float64",
+        "V15": "float64",
+        "V16": "float64",
+        "V17": "float64",
+        "V18": "float64",
+        "V19": "float64",
+        "V2": "float64",
+        "V20": "float64",
+        "V21": "float64",
+        "V22": "float64",
+        "V23": "float64",
+        "V24": "float64",
+        "V25": "float64",
+        "V26": "float64",
+        "V27": "float64",
+        "V28": "float64",
+        "V3": "float64",
+        "V4": "float64",
+        "V5": "float64",
+        "V6": "float64",
+        "V7": "float64",
+        "V8": "float64",
+        "V9": "float64"
+      },
+      "fraud_count": 269,
+      "fraud_rate": 0.0018890051473634685,
+      "null_counts": {
+        "Amount": 0,
+        "Class": 0,
+        "Time": 0,
+        "V1": 0,
+        "V10": 0,
+        "V11": 0,
+        "V12": 0,
+        "V13": 0,
+        "V14": 0,
+        "V15": 0,
+        "V16": 0,
+        "V17": 0,
+        "V18": 0,
+        "V19": 0,
+        "V2": 0,
+        "V20": 0,
+        "V21": 0,
+        "V22": 0,
+        "V23": 0,
+        "V24": 0,
+        "V25": 0,
+        "V26": 0,
+        "V27": 0,
+        "V28": 0,
+        "V3": 0,
+        "V4": 0,
+        "V5": 0,
+        "V6": 0,
+        "V7": 0,
+        "V8": 0,
+        "V9": 0
+      },
+      "ranges": {
+        "Amount": {
+          "max": 19656.53,
+          "min": 0.0
+        },
+        "Class": {
+          "max": 1.0,
+          "min": 0.0
+        },
+        "Time": {
+          "max": 84691.0,
+          "min": 0.0
+        }
+      },
+      "row_count": 142403,
+      "status": "passed"
+    }
+  },
+  "overall_status": "passed",
+  "raw_data_fingerprint": "1700322b377ac8340ab6b75f22b974944fbcaf5b4f0daf3d5e8f620d96313026",
+  "split_parameter_fingerprint": "000ac6604a30c99e85ba0baf5341ccb2753d47cc939fe361de12431b4377bdd2"
+}
