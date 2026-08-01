@@ -45,7 +45,7 @@ machine.**
 | 2:00–3:15 | B | **The gate refuses bad data** *(live)* | Money moment 1 below. Corrupt one row, run `python -m src.validate`. It writes `reports/validation_report.json` **and then** fails. Open the report: `overall_status: failed`, and the named checks that failed. The point: it records *why* it refused — the evidence survives the failure. |
 | 3:15–4:30 | B | **Pipeline & chronological split** | Narrate `make verify` (pre-run, or run live if you have the time budget). Point at the six-way split — `train` / `model_valid` / `calibration` / `prod_1..3` — and the `<-- drift injected` line on `prod_3`. Stress: split is by **time**, never random. Report §5.1, §8.1. |
 | 4:30–5:30 | C | **Tracked experiments & promotion** | MLflow UI: `mlflow ui --backend-store-uri sqlite:///mlflow.db`. Two runs, LogReg vs XGBoost. Then `reports/experiment_comparison.json` and `reports/promotion_record.json` — the promoted model, its MLflow run id, registry version, and the data/parameter fingerprints it was trained against. Promotion is by model-validation PR-AUC and is *recorded*, not asserted. |
-| 5:30–6:30 | C | **Operating point vs default 0.5** | `reports/figures/threshold_tradeoff.png` and the pair `metrics_operating.json` / `metrics_default.json`. Explain the FN≫FP cost rationale and quote **your run's** precision/recall at both thresholds. The comparison is the argument: 0.5 is not a decision, it is a default. |
+| 5:30–6:30 | C | **Operating point vs default 0.5** | `reports/figures/threshold_tradeoff.png` and the pair `metrics_operating.json` / `metrics_default.json`. Explain the FN≫FP cost rationale, then the headline trade (see below): threshold 0.98 cuts false positives **1,205 → 66** and cost **1,405 → 666**, for recall 0.917 → 0.750. The comparison is the argument: 0.5 is not a decision, it is a default. |
 | 6:30–7:30 | D | **Monitoring & the model-identity contract** *(live)* | `reports/figures/psi_prod_3.png`, then money moment 2: swap the model id in a prediction file and watch `python -m src.drift` refuse it. Monitoring will not score evidence that did not come from the promoted model. Then the PSI-not-KS point (report §8.3). |
 | 7:30–8:15 | D | **Review decision, not auto-retrain** | `reports/trigger_decisions.json` and `reports/trigger_log.md`. Show the machine-readable `reason_codes` (`PR_AUC_DROP`, `RECALL_BELOW_FLOOR`, `FEATURE_DRIFT_WARNING`, `LABELS_PENDING`, …) and the per-batch statuses. Say plainly: a `retrain` status is a **recommendation for human review**; nothing retrains or replaces a model automatically. |
 | 8:15–9:00 | D | **Reproducibility** | `reports/run_manifest.json` — source commit, Python version, exact dependency pins, data and parameter fingerprints. Then `make verify-dvc`: it archives the commit into a disposable clone and reproduces the whole graph there. Mention the `--quiet` detail (see FAQ) — it shows you understand the tool, not just the command. |
@@ -84,15 +84,52 @@ Editing `proba` in a prediction file **passes undetected** — the contract does
 not re-derive `pred` from `proba` and the threshold. Known gap; do not invite it
 in Q&A, and do not use it as a demo beat.
 
-## Honesty about the numbers
+## The numbers (authoritative real-data run)
 
-Do not read figures off an old run or off these docs. If you demo on synthetic
-data, **say so every time a number appears on screen** — the synthetic generator
-produces an easier problem than the real dataset and its metrics are not
-comparable. The workflow is what is graded; inflated numbers are not.
+From commit `36b76a0` on the genuine ULB dataset — 284,807 rows, 492 frauds
+(0.1727%), SHA-256 `1700322b…`. These are the figures committed in `reports/`.
 
-Before the demo, re-derive every quoted figure from the run you will actually
-show, and check your slides against `reports/` from that same run.
+**Promotion** — `fraud-detector:v1`, logistic regression, on the `model_valid`
+slice at threshold 0.5:
+
+| Model | PR-AUC | ROC-AUC | Recall |
+|---|---:|---:|---:|
+| Logistic Regression | **0.865** | 0.976 | 0.912 |
+| XGBoost | 0.835 | 0.983 | 0.846 |
+
+If asked why the lower ROC-AUC model won: PR-AUC is the metric that matters at
+0.17% prevalence, and the selection metric is recorded in `promotion_record.json`.
+
+**Operating point** — the strongest slide in the deck:
+
+| | Default 0.5 | Operating 0.98 |
+|---|---:|---:|
+| Precision | 0.018 | **0.214** |
+| Recall | 0.917 | 0.750 |
+| False positives | 1,205 | **66** |
+| Estimated cost | 1,405 | **666** |
+
+18× fewer false alarms, 53% lower modelled cost, for 17 points of recall.
+
+**Monitoring:**
+
+| Batch | Status | PR-AUC | Recall | Drift |
+|---|---|---:|---:|---:|
+| prod_1 | warning | 0.810 | 0.818 | 37.9% |
+| prod_2 | warning | 0.835 | 0.849 | 41.4% |
+| prod_3 | **retrain** | 0.088 | 0.545 | 58.6% |
+
+`prod_3` trips all three criteria: PR-AUC drop 85.4% > 10%, recall 0.545 < 0.75,
+drift 58.6% > 50%. Prediction PSI separates them most cleanly — 0.00 and 0.01 on
+the healthy batches against 2.69 on the drifted one.
+
+**Own the limitation before you are asked.** The calibration slice holds only
+**24 frauds**, so the operating point rests on 18 true positives and 6 false
+negatives. The method is sound; the specific 0.98 is less precise than it looks.
+Saying so first is stronger than being caught by it (report §8.5).
+
+If you re-run before the demo, re-derive these from your own `reports/` — and if
+you demo on synthetic data instead, say so every time a number appears on screen.
 
 ## Backup / FAQ
 

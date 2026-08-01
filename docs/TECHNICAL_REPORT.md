@@ -96,6 +96,24 @@ learnable signal (a few PCA components mean-shifted, mirroring how `V14`, `V4`,
 presented as real data, so CI stays fast, deterministic and network-free. Both
 datasets flow through exactly the same pipeline.
 
+**Provenance of the numbers in this report.** Every quantitative result below
+comes from one authoritative run, recorded in `reports/run_manifest.json`:
+
+| | |
+|---|---|
+| Dataset | `REAL — ULB creditcard via OpenML dataset 1597` |
+| Rows / frauds | 284,807 / 492 (0.1727%) |
+| Data SHA-256 | `1700322b377ac8340ab6b75f22b974944fbcaf5b4f0daf3d5e8f620d96313026` |
+| Source commit | `36b76a0` |
+| Python | 3.13.9 |
+| Promoted model | `fraud-detector:v1` (MLflow run `174fd070411c45f28562d346b253396b`) |
+
+The chronological split gives `train` 142,403 rows (269 frauds), `model_valid`
+28,480 (91), `calibration` 28,480 (24), and three production batches of ~28,481
+each. Any figure quoted here can be traced to the JSON contract that produced it,
+and the whole run is reproducible with
+`SOURCE_COMMIT="$(git rev-parse HEAD)" make verify`.
+
 ## 3. The original workflow and its weaknesses
 
 The baseline experimental workflow (acknowledged in `notebooks/README.md`) is a
@@ -245,27 +263,35 @@ reproducible rather than a manual "save the good one" step.
 
 ### 6.3 Results and comparison
 
-On the real ULB dataset (validation batch, default threshold 0.5):
+On the real ULB dataset (`model_valid` slice, 28,480 rows / 91 frauds, default
+threshold 0.5):
 
-| Model | PR-AUC | Recall | Notes |
-|-------|--------|--------|-------|
-| Logistic Regression | **0.818** | 0.913 | promoted |
-| XGBoost | 0.794 | 0.826 | tracked |
+| Model | PR-AUC | ROC-AUC | Recall | Precision | Notes |
+|-------|--------|---------|--------|-----------|-------|
+| Logistic Regression | **0.865** | 0.976 | 0.912 | 0.071 | promoted |
+| XGBoost | 0.835 | 0.983 | 0.846 | 0.713 | tracked |
 
 Both runs are tracked and directly comparable in MLflow; the **promotion logic
 selects whichever wins by PR-AUC** — here the class-weighted Logistic Regression,
 by a small margin over a lightly-tuned XGBoost. (Model choice is not the point of
 the project, and neither model is heavily tuned; the reorganisation is what is
-assessed.) A PR-AUC of ~0.82 is in the expected range for this dataset.
+assessed.) A PR-AUC of ~0.87 is in the expected range for this dataset.
 
-The validation confusion matrix for the promoted model at the **default 0.5
-threshold** is telling: 105 true positives, 10 false negatives, but **2,296 false
-positives** (recall 0.91, precision just **0.044**). A model that blocks 2,296
-legitimate customers to catch 105 frauds is operationally useless — which is
+The comparison also shows why a single headline number is not enough: XGBoost has
+the better ROC-AUC (0.983 vs 0.976) and vastly better precision at 0.5, yet loses
+on PR-AUC, the metric that matters under 0.17% prevalence. Selecting on PR-AUC is
+a deliberate, recorded choice — `reports/promotion_record.json` names the metric,
+the winning run and the reason.
+
+Evaluated on the held-out `calibration` slice at the **default 0.5 threshold**,
+the promoted model gives 22 true positives and 2 false negatives, but **1,205
+false positives** (recall 0.917, precision just **0.018**). A model that blocks
+1,205 legitimate customers to catch 22 frauds is operationally useless — which is
 exactly why the fixed-0.5 notebook is inadequate (requirement 4) and why the
 threshold stage (§7.4) is essential.
 
-![Confusion matrix](../reports/figures/confusion_matrix.png)
+![Confusion matrix — default threshold 0.5](../reports/figures/confusion_matrix_default.png)
+![Confusion matrix — operating threshold 0.98](../reports/figures/confusion_matrix_operating.png)
 ![Precision–Recall curve](../reports/figures/pr_curve.png)
 
 ## 7. Systematic testing and validation
@@ -281,7 +307,12 @@ silently corrupting a model or a prediction.
 
 ### 7.2 Unit tests (requirement, and rubric "systematic testing")
 
-The `tests/` suite (13 tests, run in CI) covers the logic that matters:
+The `tests/` suite (**104 tests across 12 files**, run in CI) covers the logic
+that matters. 102 are evidence-independent and run as `make test-fast` before
+anything else; the remaining 2 are marked `integration` because they read
+generated pipeline evidence. None are skipped — `test_reproducibility.py`
+asserts that no test carries a skip marker, so a silent skip cannot hide a
+failure. The suite covers:
 
 - **Splitting** is time-ordered and disjoint (`test_ingest.py`).
 - **Drift injection** shifts `Amount` and the signal features as intended, and
@@ -312,10 +343,22 @@ A fraud model's *operating threshold* is a business decision, not a default.
 `src/threshold.py` sweeps thresholds from 0.01 to 0.99 and picks the one that
 minimises an expected business cost, with a false negative weighted 100× a false
 positive (`params.yaml`). On the real data this selects a threshold of **0.98**,
-moving the model from the unusable 0.5 operating point (precision 0.044) to
-**recall 0.85 at precision 0.41** — a defensible fraud-operations trade-off that
-cuts false positives from ~2,300 to a few hundred while still catching most
-fraud.
+moving the model from the unusable 0.5 operating point to a defensible
+fraud-operations trade-off:
+
+| | Default 0.5 | Operating 0.98 |
+|---|---:|---:|
+| Precision | 0.018 | **0.214** |
+| Recall | 0.917 | 0.750 |
+| False positives | 1,205 | **66** |
+| False negatives | 2 | 6 |
+| Estimated business cost | 1,405 | **666** |
+
+Choosing the cost-minimising threshold cuts false alarms **18-fold** and the
+modelled business cost by **53%**, at the price of 17 points of recall — four
+additional missed frauds in exchange for 1,139 fewer blocked customers. Under the
+stated 100:1 cost ratio that is the better operating point, and the point is that
+the ratio, not a default, is what decides it.
 
 ![Threshold trade-off](../reports/figures/threshold_tradeoff.png)
 
@@ -374,20 +417,25 @@ Each batch produces a JSON summary (the machine-readable contract for the
 trigger), a PSI bar chart, and — when Evidently imports cleanly — a rich HTML
 report. The results on the real data:
 
-| Batch | % features drifted | Amount PSI | Prediction PSI | PR-AUC | Recall | Verdict |
-|-------|--------------------|------------|----------------|--------|--------|---------|
-| prod_1 | 38% | 0.00 | 0.01 | 0.810 | 0.818 | natural drift, healthy |
-| prod_2 | 41% | 0.00 | 0.01 | 0.835 | 0.849 | natural drift, healthy |
-| prod_3 | 59% | 0.28 | 2.78 | 0.088 | 0.545 | drifted + degraded |
+| Batch | % features drifted | Amount PSI | Prediction PSI | PR-AUC | Recall | Precision | Verdict |
+|-------|--------------------|------------|----------------|--------|--------|-----------|---------|
+| prod_1 | 37.9% (11/29) | 0.00 | 0.00 | 0.810 | 0.818 | 0.329 | natural drift, healthy |
+| prod_2 | 41.4% (12/29) | 0.00 | 0.01 | 0.835 | 0.849 | 0.592 | natural drift, healthy |
+| prod_3 | 58.6% (17/29) | 0.28 | 2.69 | 0.088 | 0.545 | 0.080 | drifted + degraded |
 
 A key real-data finding: **even the un-injected batches show 38–41% feature
 drift**. The ULB features genuinely shift across the two-day window (`V1`, `V3`,
 `V28` have the largest PSI) — real, mild covariate drift, but the model's
 *performance* on those batches stays close to baseline (PR-AUC ≈ 0.81–0.84,
-recall ≈ 0.82–0.85). Only the injected `prod_3` combines heavy drift (59%,
-`Amount` PSI 0.28, prediction PSI 2.78) with a collapse in performance
+recall ≈ 0.82–0.85). Only the injected `prod_3` combines heavy drift (58.6%,
+`Amount` PSI 0.28, prediction PSI 2.69) with a collapse in performance
 (PR-AUC 0.09, recall 0.55). This is exactly why the trigger weights
 performance-based signals, not drift counts alone (§8.4).
+
+The prediction PSI column separates the two cases most cleanly: 0.00 and 0.01 on
+the healthy batches against 2.69 on the drifted one. Feature drift alone would
+have flagged all three; the model's own output distribution only moves when the
+drift is one it cannot absorb.
 
 ![PSI — drifted batch prod_3](../reports/figures/psi_prod_3.png)
 
@@ -418,13 +466,20 @@ Justification of the thresholds:
   dataset the natural background is near zero, so the threshold is lowered
   accordingly in `params.yaml`.)
 
-Applied to the batches, the trigger produces `reports/trigger_log.md`:
+Applied to the batches, the trigger produces `reports/trigger_decisions.json` and
+its derived `reports/trigger_log.md`. The baseline is the promoted model's
+calibration PR-AUC of **0.6033** at the operating threshold:
 
-| Batch | Decision | Reason |
-|-------|----------|--------|
-| prod_1 | ⚠️ warning | 38% features drifted (warning band); performance healthy |
-| prod_2 | ⚠️ warning | 41% features drifted (warning band); performance healthy |
-| prod_3 | 🚨 retrain | PR-AUC drop 89% > 10%; recall 0.55 < 0.75; 59% drifted > 50% |
+| Batch | Decision | Reason codes | Reason |
+|-------|----------|--------------|--------|
+| prod_1 | ⚠️ warning | `FEATURE_DRIFT_WARNING` | 37.9% feature drift is in the warning band |
+| prod_2 | ⚠️ warning | `FEATURE_DRIFT_WARNING` | 41.4% feature drift is in the warning band |
+| prod_3 | 🚨 retrain | `PR_AUC_DROP`, `RECALL_BELOW_FLOOR`, `FEATURE_DRIFT_RETRAIN` | PR-AUC drop 85.4% exceeds 10%; recall 0.545 is below 0.75; 58.6% feature drift exceeds 50% |
+
+The reason codes are emitted as machine-readable evidence rather than parsed back
+out of prose, so the scheduled workflow can act on the decision without
+pattern-matching a log. A `retrain` status is a **recommendation for human
+review**; nothing retrains or replaces a model automatically.
 
 This is a faithful, honest result on real data: the natural drift of the two-day
 window raises **warnings** on the healthy batches (correctly — an analyst should
@@ -444,10 +499,20 @@ We discuss the risks the briefing asks about honestly:
   would fire retrain on every batch. We therefore base the drift flag on **PSI**
   (a magnitude measure, stable across sample sizes) and report KS for
   information only — and we pair it with a warning band before any hard retrain.
+- **A thin calibration sample.** The operating threshold is selected on the
+  `calibration` slice, which holds 28,480 rows but only **24 frauds** (0.084%) —
+  the chronological split happens to place a low-fraud stretch there. The chosen
+  point rests on 18 true positives and 6 false negatives, so a handful of cases
+  either way would move both the threshold and the reported precision/recall.
+  The *method* is sound and reproducible; the *specific* 0.98 is less precise
+  than three decimal places suggest. With more data we would select the threshold
+  by cross-validation across several time folds rather than one slice.
 - **Delayed fraud labels.** In production, ground-truth fraud labels arrive days
   or weeks late (chargebacks, investigations). The performance side of the
   trigger is therefore lagged; feature and prediction drift (which need no
-  labels) act as earlier warnings.
+  labels) act as earlier warnings. The monitoring stage models this explicitly:
+  each batch records a `label_status`, and the trigger emits `LABELS_PENDING`
+  rather than a false all-clear when labels have not yet arrived.
 - **Retraining on poor-quality data.** A retrain fired by a data-quality
   incident could learn from corrupt data — which is why validation gates every
   batch first.
@@ -474,14 +539,24 @@ Reproducibility is treated as a first-class requirement, not an afterthought:
 - **Fixed seeds** across data generation, splitting and model training.
 - **Reproducible data** — `make fetch-data` pulls the real dataset from OpenML
   (no Kaggle account); `src/simulate_data.py` is the offline/CI fallback.
-- **DVC** stage graph (`dvc.yaml`) for data/artefact versioning and `dvc repro`.
-- **A single command** — `make pipeline` — runs the full workflow in dependency
-  order and regenerates every artefact; `make test` runs the suite.
-- **Continuous integration** (GitHub Actions) installs the pinned environment,
-  runs the tests, runs a data-validation smoke check, and executes the **entire
-  pipeline** (on synthetic data, to stay fast and network-free), uploading the
-  resulting evidence as a build artefact — so every push proves the workflow
-  still runs end-to-end.
+- **DVC** stage graph (`dvc.yaml`) for artefact versioning. The raw dataset is an
+  *input* to the graph, never a stage output: DVC deletes a stage's declared
+  outputs before running it, so a stage that generated `data/raw/creditcard.csv`
+  would erase a real dataset on every `dvc repro` — unrecoverably, as that file is
+  git-ignored with no remote. `make verify-dvc` reproduces the graph inside a
+  disposable clone of the exact commit and never touches the caller's data.
+- **A single command** — `SOURCE_COMMIT="$(git rev-parse HEAD)" make verify` —
+  runs the full workflow in dependency order, regenerates every artefact, builds
+  the dashboard and runs the whole test suite.
+- **A run manifest** (`reports/run_manifest.json`) recording the source commit,
+  Python version, exact dependency versions, and SHA-256 fingerprints of both the
+  dataset and `params.yaml`, so any result can be tied to the inputs that
+  produced it.
+- **Continuous integration** (GitHub Actions) installs the pinned environment and
+  runs the same `make verify` contract, plus the clean-clone DVC reproduction and
+  a cross-output evidence-consistency check, uploading the resulting evidence as a
+  build artefact. A second job builds the digest-pinned Docker image, asserts the
+  interpreter is exactly Python 3.13.9, and runs the identical contract inside it.
 
 ### 9.1 Scheduled monitoring and a published dashboard
 
