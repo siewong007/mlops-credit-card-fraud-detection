@@ -4,6 +4,8 @@ Keep minimal: scale Amount (fit on train only to avoid leakage). The fitted
 scaler is persisted alongside the model so batch inference applies the exact
 same transform as training.
 """
+from pathlib import Path
+
 import joblib
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -29,9 +31,10 @@ def xy(df: pd.DataFrame):
     return df[FEATURES], df[TARGET]
 
 
-def save_scaler(scaler: StandardScaler) -> None:
+def save_scaler(scaler: StandardScaler) -> Path:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(scaler, _SCALER_PATH)
+    return _SCALER_PATH
 
 
 def load_scaler() -> StandardScaler:

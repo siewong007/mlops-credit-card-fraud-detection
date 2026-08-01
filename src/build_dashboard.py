@@ -1,31 +1,11 @@
-"""Build the static monitoring dashboard published to GitHub Pages.
-
-Turns the evidence produced by the pipeline (`reports/`, `models/`) into a
-self-contained static site under `site/`:
-
-    site/index.html      overview: dataset provenance, promoted model, operating
-                         point, per-batch drift + trigger decisions, figures
-    site/figures/*.png   evaluation and drift figures
-    site/drift/*.html    the full Evidently reports (when present)
-
-This is the "monitoring dashboard" face of the workflow: the same JSON contract
-the retraining trigger consumes, rendered for humans. No external assets are
-referenced, so the page renders offline and on Pages identically.
-"""
+"""Render pipeline evidence contracts as a self-contained monitoring dashboard."""
 import json
 import shutil
 from datetime import datetime, timezone
+from html import escape
+from pathlib import Path
 
-from src.config import (
-    DRIFT_DIR,
-    FIGURES_DIR,
-    MODELS_DIR,
-    REPORTS_DIR,
-    ROOT,
-    load_params,
-    read_provenance,
-)
-from src.retrain_trigger import decide
+from src.config import REPORTS_DIR, ROOT
 
 SITE_DIR = ROOT / "site"
 
@@ -84,152 +64,209 @@ footer{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--line);
 """
 
 
-def _kpi(label: str, value: str) -> str:
-    return f'<div class="kpi"><div class="k">{label}</div><div class="v">{value}</div></div>'
-
-
-def _reasons(baseline_pr_auc: float, b: dict, params: dict) -> str:
-    from src.retrain_trigger import _reasons as r
-
-    return r(baseline_pr_auc, b, params)
-
-
-def build() -> dict:
-    params = load_params()
-    baseline = json.loads((MODELS_DIR / "baseline.json").read_text())
-    threshold = json.loads((MODELS_DIR / "threshold.json").read_text())
-    summaries = json.loads((REPORTS_DIR / "drift_summary.json").read_text())
-    valid = json.loads((REPORTS_DIR / "metrics_valid.json").read_text())
-    prov = read_provenance(params)
-
-    base_pr = baseline["valid_at_0.5"]["pr_auc"]
-    t = threshold["threshold"]
-    tm = threshold["valid_metrics_at_threshold"]
-
-    decisions = [(b, decide(base_pr, b, params)) for b in summaries]
-    worst = ("retrain" if any(d == "retrain" for _, d in decisions)
-             else "warning" if any(d == "warning" for _, d in decisions) else "ok")
-
-    # --- assets ------------------------------------------------------------
-    SITE_DIR.mkdir(parents=True, exist_ok=True)
-    (SITE_DIR / ".nojekyll").write_text("")  # serve _-prefixed paths verbatim
-    fig_out = SITE_DIR / "figures"
-    fig_out.mkdir(exist_ok=True)
-    for png in sorted(FIGURES_DIR.glob("*.png")):
-        shutil.copy2(png, fig_out / png.name)
-    drift_out = SITE_DIR / "drift"
-    drift_out.mkdir(exist_ok=True)
-    evidently = sorted(DRIFT_DIR.glob("*.html"))
-    for html in evidently:
-        shutil.copy2(html, drift_out / html.name)
-
-    # --- html --------------------------------------------------------------
-    is_real = prov.get("source", "").startswith("REAL")
-    prov_note = (
-        f'<div class="note"><strong>Data provenance:</strong> {prov.get("source", "unknown")}'
-        + (f' — {prov["rows"]:,} rows, {prov["fraud"]} fraud '
-           f'({prov["fraud_rate"]:.5f}).' if "rows" in prov else "")
-        + ("" if is_real else
-           " <strong>These figures come from synthetic data</strong> and demonstrate the "
-           "workflow only — they are not submission-grade results.")
-        + "</div>"
+def _kpi(label: str, value) -> str:
+    return (
+        f'<div class="kpi"><div class="k">{escape(label)}</div>'
+        f'<div class="v">{escape("n/a" if value is None else str(value))}</div></div>'
     )
+
+
+def _metric(value, digits=3) -> str:
+    return "n/a" if value is None else f"{value:.{digits}f}"
+
+
+def _count(value) -> str:
+    return "n/a" if value is None else f"{value:,}"
+
+
+def _badge(status: str) -> str:
+    label, css = _BADGE[status]
+    return f'<span class="badge {css}">{escape(label)}</span>'
+
+
+def _copy_assets(source: Path, destination: Path) -> None:
+    if destination.exists():
+        shutil.rmtree(destination)
+    if source.exists():
+        shutil.copytree(source, destination)
+    else:
+        destination.mkdir()
+
+
+def build(
+    reports_dir: Path = REPORTS_DIR,
+    site_dir: Path = SITE_DIR,
+) -> dict:
+    """Build a static page from the seven stable report JSON contracts."""
+    promotion = json.loads((reports_dir / "promotion_record.json").read_text())
+    operating_point = json.loads((reports_dir / "operating_point.json").read_text())
+    operating = json.loads((reports_dir / "metrics_operating.json").read_text())
+    default = json.loads((reports_dir / "metrics_default.json").read_text())
+    summaries = json.loads((reports_dir / "drift_summary.json").read_text())
+    trigger = json.loads((reports_dir / "trigger_decisions.json").read_text())
+    manifest = json.loads((reports_dir / "run_manifest.json").read_text())
+
+    decisions_by_batch = {decision["batch"]: decision for decision in trigger["decisions"]}
+    summary_batches = {summary["batch"] for summary in summaries}
+    if summary_batches != set(decisions_by_batch):
+        raise ValueError("drift summaries and trigger decisions have mismatched batch sets")
+    decisions = [decisions_by_batch[summary["batch"]] for summary in summaries]
+
+    figures_dir = reports_dir / "figures"
+    drift_dir = reports_dir / "drift"
+
+    data = manifest["data"]
+    for summary in summaries:
+        native_report = drift_dir / f"{summary['batch']}.json"
+        if not native_report.exists():
+            raise FileNotFoundError(
+                f"native per-batch drift evidence missing: {native_report}"
+            )
+        native = json.loads(native_report.read_text())
+        if any(native.get(key) != value for key, value in summary.items()):
+            raise ValueError(
+                f"native per-batch drift evidence does not match current summary: "
+                f"{summary['batch']}"
+            )
+        evidently_html = drift_dir / f"{summary['batch']}.html"
+        if (
+            summary["evidently"]["status"] == "generated"
+            and not evidently_html.is_file()
+        ):
+            raise FileNotFoundError(
+                f"generated Evidently HTML evidence missing: {evidently_html}"
+            )
+
+    site_dir.mkdir(parents=True, exist_ok=True)
+    (site_dir / ".nojekyll").write_text("")
+    fig_out = site_dir / "figures"
+    drift_out = site_dir / "drift"
+    _copy_assets(figures_dir, fig_out)
+    _copy_assets(drift_dir, drift_out)
+
+    def evidently_cell(summary):
+        evidence = summary["evidently"]
+        status = evidence["status"]
+        error = (
+            ""
+            if status == "generated"
+            else f"<br>{escape(str(evidence['error_type']))}: "
+            f"{escape(str(evidence['message']))}"
+        )
+        return f"Evidently: {escape(status)}{error}"
 
     rows = "\n".join(
-        f"<tr><td><code>{b['batch']}</code></td>"
-        f"<td>{b['n_rows']:,}</td><td>{b['pr_auc']:.3f}</td><td>{b['recall']:.3f}</td>"
-        f"<td>{b['precision']:.3f}</td><td>{b['pct_drifted_features']:.0f}%</td>"
-        f"<td>{b['amount_psi']:.2f}</td><td>{b['prediction_psi']:.2f}</td>"
-        f'<td><span class="badge {_BADGE[d][1]}">{_BADGE[d][0]}</span></td>'
-        f'<td class="reason">{_reasons(base_pr, b, params)}</td></tr>'
-        for b, d in decisions
+        f"<tr><td><code>{escape(summary['batch'])}</code></td>"
+        f"<td>{_count(summary['n_rows'])}</td><td>{_metric(summary['pr_auc'])}</td>"
+        f"<td>{_metric(summary['recall'])}</td><td>{_metric(summary['precision'])}</td>"
+        f"<td>{_metric(summary['pct_drifted_features'], 1)}%</td>"
+        f"<td>{_metric(summary['amount_psi'])}</td><td>{_metric(summary['prediction_psi'])}</td>"
+        f"<td>{escape(decision['label_status'])}</td><td>{_badge(decision['status'])}</td>"
+        f"<td class=\"reason\">{escape(', '.join(decision['reason_codes']))}<br>"
+        f"{escape('; '.join(decision['reasons']))}</td>"
+        f"<td class=\"reason\">{evidently_cell(summary)}</td></tr>"
+        for summary, decision in zip(summaries, decisions)
     )
 
-    figs = "\n".join(
-        f'<figure><img src="figures/{name}" alt="{cap}"><figcaption>{cap}</figcaption></figure>'
-        for name, cap in [
-            ("pr_curve.png", "Precision–Recall curve (validation)"),
-            ("confusion_matrix.png", "Confusion matrix (validation, threshold 0.5)"),
-            ("threshold_tradeoff.png", "Cost-based threshold selection"),
-            *[(f"psi_{b['batch']}.png", f"Feature PSI vs training reference — {b['batch']}")
-              for b in summaries],
-        ] if (fig_out / name).exists()
+    figures = "\n".join(
+        f'<figure><img src="figures/{escape(figure.name)}" alt="{escape(figure.stem)}">'
+        f"<figcaption>{escape(figure.stem.replace('_', ' '))}</figcaption></figure>"
+        for figure in sorted(figures_dir.glob("*.png"))
     )
+    report_links = []
+    for summary in summaries:
+        batch = summary["batch"]
+        report_links.append(
+            f'<li><a href="drift/{escape(batch)}.json">'
+            f"Native drift evidence — {escape(batch)}</a><br>"
+            f'<span class="evidence-id">Native drift {escape(batch)} · model '
+            f"{escape(str(summary['promoted_model_id']))} · operating threshold "
+            f"{escape(_metric(summary['operating_threshold'], 2))} · batch fingerprint "
+            f"{escape(summary['batch_data_fingerprint'])} · labels "
+            f"{escape(summary['label_status'])} · Evidently "
+            f"{escape(summary['evidently']['status'])}</span></li>"
+        )
+        html_report = drift_dir / f"{batch}.html"
+        if summary["evidently"]["status"] == "generated":
+            report_links.append(
+                f'<li><a href="drift/{escape(batch)}.html">'
+                f"Evidently HTML — {escape(batch)}</a></li>"
+            )
+    links = "\n".join(report_links)
 
-    links = "\n".join(
-        f'<li><a href="drift/{h.name}">Evidently drift report — {h.stem}</a></li>'
-        for h in evidently
-    ) or '<li class="reason">Evidently reports not generated in this run '\
-         '(native PSI/KS drift analysis above is the primary evidence).</li>'
-
-    trig = params["trigger"]
+    costs = operating_point["cost_assumptions"]
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-
-    html = f"""<!doctype html>
+    evidence_id = (
+        f"Model {escape(promotion['promoted_model_id'])} · "
+        f"MLflow run {escape(promotion['mlflow_run_id'])} · "
+        f"registry version {escape(str(promotion['registered_model_version']))} · "
+        f"operating threshold {escape(_metric(operating_point['threshold'], 2))} · "
+        f"status {escape(trigger['overall_status'])}"
+    )
+    page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fraud detection — model monitoring dashboard</title>
 <style>{_CSS}</style></head><body><div class="wrap">
 
 <h1>Credit card fraud detection — monitoring dashboard</h1>
-<p class="sub">Automated output of the reorganised MLOps pipeline · generated {generated}</p>
+<p class="sub">Evidence-contract rendering · generated {generated}</p>
+<p class="evidence-id">{evidence_id}</p>
 
-{prov_note}
-
-<h2>Promoted model &amp; operating point</h2>
+<h2>Promotion and data evidence</h2>
 <div class="grid">
-  {_kpi("Promoted model", baseline["model"].replace("_", " "))}
-  {_kpi("Baseline PR-AUC", f"{base_pr:.3f}")}
-  {_kpi("ROC-AUC", f"{valid['roc_auc']:.3f}")}
-  {_kpi("Threshold", f"{t:.2f}")}
-  {_kpi("Recall @ threshold", f"{tm['recall']:.3f}")}
-  {_kpi("Precision @ threshold", f"{tm['precision']:.3f}")}
-  {_kpi("Overall status", _BADGE[worst][0])}
+  {_kpi("Promoted model", promotion["promoted_model_id"])}
+  {_kpi("MLflow run", promotion["mlflow_run_id"])}
+  {_kpi("Model version", f"Version {promotion['registered_model_version']}")}
+  {_kpi("Data source", data["source"])}
+  {_kpi("Data fingerprint", data["fingerprint_sha256"])}
+  {_kpi("Overall status", trigger["overall_status"])}
 </div>
-<div class="note">The operating threshold is chosen by minimising expected business
-cost with a false negative weighted {params['threshold']['cost_false_negative']}&times; a
-false positive — not left at the default 0.5.</div>
 
-<h2>Per-batch monitoring &amp; retraining trigger</h2>
+<h2>Operating threshold evidence</h2>
+<div class="grid">
+  {_kpi("Operating threshold", _metric(operating_point["threshold"], 2))}
+  {_kpi("PR-AUC", _metric(operating["pr_auc"]))}
+  {_kpi("ROC-AUC", _metric(operating["roc_auc"]))}
+  {_kpi("Recall", _metric(operating["recall"]))}
+  {_kpi("Precision", _metric(operating["precision"]))}
+</div>
+<div class="note">Operating threshold {escape(_metric(operating_point["threshold"], 2))}
+minimises the stated cost rationale: false negative {escape(str(costs["false_negative"]))}
+and false positive {escape(str(costs["false_positive"]))}.</div>
+
+<h2>Default threshold comparison</h2>
+<div class="grid">
+  {_kpi("Default threshold", _metric(default["threshold"], 2))}
+  {_kpi("PR-AUC", _metric(default["pr_auc"]))}
+  {_kpi("ROC-AUC", _metric(default["roc_auc"]))}
+  {_kpi("Recall", _metric(default["recall"]))}
+  {_kpi("Precision", _metric(default["precision"]))}
+</div>
+
+<h2>Per-batch monitoring evidence</h2>
 <div class="scroll"><table>
 <thead><tr><th>Batch</th><th>Rows</th><th>PR-AUC</th><th>Recall</th><th>Precision</th>
-<th>Drifted</th><th>Amount PSI</th><th>Pred PSI</th><th>Decision</th><th>Reason</th></tr></thead>
-<tbody>
-{rows}
-</tbody></table></div>
-<div class="note"><strong>Trigger rule:</strong> retrain if PR-AUC drops more than
-{trig['pr_auc_drop_pct']}% versus the validation baseline, <em>or</em> recall at the
-operating threshold falls below {trig['recall_floor']}, <em>or</em> more than
-{trig['drifted_features_pct']}% of monitored features drift (PSI &gt;
-{params['drift']['psi_threshold']}). Drift is flagged on PSI magnitude rather than a KS
-p-value, which is over-sensitive at these batch sizes.</div>
+<th>Drifted</th><th>Amount PSI</th><th>Prediction PSI</th><th>Labels</th><th>Status</th>
+<th>Decision evidence</th><th>Evidently</th></tr></thead>
+<tbody>{rows}</tbody></table></div>
 
-<h2>Evaluation &amp; drift figures</h2>
-<div class="figs">
-{figs}
-</div>
+<h2>Local evaluation and drift figures</h2>
+<div class="figs">{figures}</div>
 
-<h2>Full drift reports</h2>
-<ul class="links">
-{links}
-</ul>
+<h2>Local drift evidence</h2>
+<ul class="links">{links}</ul>
 
-<footer>
-Generated by <code>python -m src.build_dashboard</code> from the pipeline's own evidence
-(<code>reports/</code>, <code>models/</code>). Academic project — the dataset covers two
-days of transactions, so this demonstrates operational monitoring rather than long-term
-production drift.
-</footer>
+<footer>A <code>retrain</code> status is review-only and requires human approval;
+it does not start training or replace the promoted model.</footer>
 
 </div></body></html>
 """
-    (SITE_DIR / "index.html").write_text(html)
-    return {"status": worst, "decisions": decisions, "site": SITE_DIR}
+    (site_dir / "index.html").write_text(page, encoding="utf-8")
+    return {"status": trigger["overall_status"], "decisions": decisions, "site": site_dir}
 
 
 def main() -> None:
-    if not (MODELS_DIR / "baseline.json").exists():
-        raise SystemExit("models/baseline.json missing — run `make pipeline` first")
     out = build()
     print(f"dashboard written to {out['site']}/index.html  (overall status: {out['status']})")
 

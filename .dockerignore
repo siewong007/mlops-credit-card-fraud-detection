@@ -1,13 +1,37 @@
+# Source-control and local environments
+.git
 .venv/
-.git/
+venv/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data, generated pipeline evidence, and model state
+data/raw/*
+!data/raw/.gitkeep
+data/batches/*
+!data/batches/.gitkeep
+models/
+site/
+reports/
+mlflow.db
 mlruns/
 mlartifacts/
-mlflow.db
-models/
-data/raw/*.csv
-data/batches/*.csv
-reports/drift/*.html
+
+# Private, distributable, or large local files
+.env
+.env.*
+*.key
+*.pem
+submission-private/
+dist/
+*.zip
+*.tar
+*.tar.gz
+*.7z
+MLOpsMaster_Final_Project_Briefing_Credit_Card_Fraud.docx
 .DS_Store

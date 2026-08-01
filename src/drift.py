@@ -14,7 +14,7 @@ the retraining trigger has no heavy dependency. A rich Evidently HTML report is
 additionally emitted per batch when Evidently is importable (best-effort).
 The per-batch summary JSON is the contract consumed by ``src.retrain_trigger``.
 """
-import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -23,7 +23,9 @@ from scipy.stats import ks_2samp
 from src import features
 from src.artifacts import load_model
 from src.config import DRIFT_DIR, FIGURES_DIR, REPORTS_DIR, batch_dir, ensure_dirs, load_params
+from src.evidence import write_json
 from src.evaluate import compute_metrics
+from src.validate import read_stable_csv
 
 
 def psi(reference: np.ndarray, current: np.ndarray, bins: int = 10) -> float:
@@ -82,21 +84,167 @@ def _plot_psi(detail: dict, batch: str, psi_th: float, path) -> None:
     plt.close(fig)
 
 
-def _evidently_html(reference: pd.DataFrame, current: pd.DataFrame, path) -> bool:
-    """Best-effort rich HTML report. Evidently's API changes across versions,
-    so any failure is swallowed — the native JSON is the real evidence."""
+def summarize_batch(
+    reference: pd.DataFrame,
+    current: pd.DataFrame,
+    reference_proba: np.ndarray,
+    predictions: pd.DataFrame,
+    *,
+    batch_name: str,
+    threshold: float,
+    promoted_model_id: str,
+    batch_data_fingerprint: str,
+    params: dict,
+) -> dict:
+    """Return native drift and, where available, label-based batch evidence."""
+    probability = _validate_prediction_contract(
+        current,
+        predictions,
+        threshold=threshold,
+        promoted_model_id=promoted_model_id,
+        batch_data_fingerprint=batch_data_fingerprint,
+    )
+    drift = feature_drift(reference, current, params)
+    labels_available = features.TARGET in predictions
+    performance = None
+    if labels_available:
+        costs = params["threshold"]
+        performance = compute_metrics(
+            predictions[features.TARGET],
+            probability,
+            threshold,
+            cost_false_negative=costs["cost_false_negative"],
+            cost_false_positive=costs["cost_false_positive"],
+        )
+    target_rate = float(predictions[features.TARGET].mean()) if labels_available else None
+    baseline_target_rate = float(reference[features.TARGET].mean())
+    return {
+        "batch": batch_name,
+        "n_rows": len(current),
+        "label_status": "available" if labels_available else "pending",
+        "promoted_model_id": promoted_model_id,
+        "operating_threshold": float(threshold),
+        "batch_data_fingerprint": batch_data_fingerprint,
+        "pct_drifted_features": drift["pct_drifted_features"],
+        "n_drifted": drift["n_drifted"],
+        "amount_psi": drift["per_feature"]["Amount"]["psi"],
+        "prediction_psi": round(psi(reference_proba, probability), 4),
+        "target_rate": target_rate,
+        "baseline_target_rate": baseline_target_rate if labels_available else None,
+        "target_rate_delta": target_rate - baseline_target_rate if labels_available else None,
+        "pr_auc": performance["pr_auc"] if performance else None,
+        "precision": performance["precision"] if performance else None,
+        "recall": performance["recall"] if performance else None,
+        "estimated_business_cost": (
+            performance["estimated_business_cost"] if performance else None
+        ),
+        "per_feature": drift["per_feature"],
+    }
+
+
+def _validate_prediction_contract(
+    current: pd.DataFrame,
+    predictions: pd.DataFrame,
+    *,
+    threshold: float,
+    promoted_model_id: str,
+    batch_data_fingerprint: str,
+) -> np.ndarray:
+    if len(predictions) != len(current):
+        raise ValueError(
+            "prediction row count does not match the current batch row count"
+        )
+    required = {
+        "row_position",
+        "Time",
+        "Amount",
+        "proba",
+        "pred",
+        "operating_threshold",
+        "promoted_model_id",
+        "batch_data_fingerprint",
+    }
+    missing = required - set(predictions)
+    if missing:
+        raise ValueError(f"prediction evidence is missing columns: {sorted(missing)}")
+    if not np.array_equal(
+        predictions["row_position"].to_numpy(), np.arange(len(current))
+    ):
+        raise ValueError("prediction row alignment does not match the current batch")
+    aligned_columns = ["Time", "Amount"]
+    current_labeled = features.TARGET in current
+    predictions_labeled = features.TARGET in predictions
+    if current_labeled != predictions_labeled:
+        raise ValueError("prediction row alignment does not match current Class labels")
+    if current_labeled:
+        aligned_columns.append(features.TARGET)
+    if any(
+        not np.array_equal(
+            current[column].to_numpy(), predictions[column].to_numpy()
+        )
+        for column in aligned_columns
+    ):
+        raise ValueError("prediction row alignment does not match the current batch")
+    if not bool(
+        len(predictions)
+        and predictions["operating_threshold"].eq(float(threshold)).all()
+    ):
+        raise ValueError("prediction operating threshold does not match")
+    if not bool(
+        len(predictions)
+        and predictions["promoted_model_id"].eq(promoted_model_id).all()
+    ):
+        raise ValueError("prediction promoted model does not match")
+    if not bool(
+        len(predictions)
+        and predictions["batch_data_fingerprint"].eq(
+            batch_data_fingerprint
+        ).all()
+    ):
+        raise ValueError("prediction batch data fingerprint does not match")
+    probability = pd.to_numeric(
+        predictions["proba"], errors="coerce"
+    ).to_numpy(dtype=float)
+    if not np.isfinite(probability).all():
+        raise ValueError("prediction evidence must contain finite probabilities")
+    prediction = pd.to_numeric(
+        predictions["pred"], errors="coerce"
+    ).to_numpy(dtype=float)
+    if not set(prediction).issubset({0.0, 1.0}):
+        raise ValueError("prediction evidence must contain binary predictions")
+    # Binary and finite is not enough: labels must be the ones this threshold
+    # actually produces, or edited probabilities pass the contract unnoticed.
+    if not np.array_equal(prediction, (probability >= float(threshold)).astype(float)):
+        raise ValueError(
+            "prediction labels do not match the operating threshold applied to "
+            "the recorded probabilities"
+        )
+    return probability
+
+
+def evidently_report(reference: pd.DataFrame, current: pd.DataFrame, path) -> dict:
+    """Emit optional Evidently HTML without weakening native monitoring."""
+    target = Path(path)
     try:
+        target.unlink(missing_ok=True)
         from evidently import Report
         from evidently.presets import DataDriftPreset
 
-        cols = features.FEATURES + [features.TARGET]
+        columns = features.FEATURES.copy()
+        if features.TARGET in reference and features.TARGET in current:
+            columns.append(features.TARGET)
         snapshot = Report([DataDriftPreset()]).run(
-            reference_data=reference[cols], current_data=current[cols]
+            reference_data=reference[columns], current_data=current[columns]
         )
-        snapshot.save_html(str(path))
-        return True
-    except Exception:  # noqa: BLE001 - optional, never fatal
-        return False
+        snapshot.save_html(str(target))
+        return {"status": "generated", "error_type": None, "message": None}
+    except Exception as error:  # noqa: BLE001 - optional, never fatal
+        target.unlink(missing_ok=True)
+        return {
+            "status": "failed",
+            "error_type": type(error).__name__,
+            "message": str(error),
+        }
 
 
 def main() -> None:
@@ -107,45 +255,50 @@ def main() -> None:
 
     from src.artifacts import load_threshold
 
-    threshold = load_threshold()["threshold"]
+    operating_point = load_threshold()
+    threshold = operating_point["threshold"]
+    promoted_model_id = operating_point["promoted_model_id"]
     train = pd.read_csv(bdir / "train.csv")
-    valid = pd.read_csv(bdir / "valid.csv")
+    calibration, _ = read_stable_csv(
+        bdir / "calibration.csv",
+        expected_sha256=operating_point["calibration_data_fingerprint"],
+    )
     model, scaler = load_model(), features.load_scaler()
-    ref_proba = model.predict_proba(features.transform(valid, scaler)[features.FEATURES])[:, 1]
-    base_fraud_rate = float(train[features.TARGET].mean())
+    ref_proba = model.predict_proba(
+        features.transform(calibration, scaler)[features.FEATURES]
+    )[:, 1]
 
-    summaries, evidently_ok = [], False
+    summaries = []
     for i in range(1, params["data"]["n_prod_batches"] + 1):
         name = f"prod_{i}"
-        cur = pd.read_csv(bdir / f"{name}.csv")
+        source_path = bdir / f"{name}.csv"
+        cur, batch_data_fingerprint = read_stable_csv(source_path)
         preds = pd.read_csv(bdir / f"preds_{name}.csv")
 
-        fd = feature_drift(train, cur, params)
-        perf = compute_metrics(preds[features.TARGET], preds["proba"], threshold=threshold)
-        summary = {
-            "batch": name,
-            "n_rows": len(cur),
-            "pct_drifted_features": fd["pct_drifted_features"],
-            "n_drifted": fd["n_drifted"],
-            "amount_psi": fd["per_feature"]["Amount"]["psi"],
-            "prediction_psi": round(psi(ref_proba, preds["proba"].to_numpy()), 4),
-            "fraud_rate": round(float(cur[features.TARGET].mean()), 5),
-            "baseline_fraud_rate": round(base_fraud_rate, 5),
-            "pr_auc": perf["pr_auc"],
-            "recall": perf["recall"],
-            "precision": perf["precision"],
-        }
-        (DRIFT_DIR / f"{name}.json").write_text(json.dumps({**summary, "per_feature": fd["per_feature"]}, indent=2))
-        _plot_psi(fd["per_feature"], name, psi_th, FIGURES_DIR / f"psi_{name}.png")
-        evidently_ok |= _evidently_html(train, cur, DRIFT_DIR / f"{name}.html")
-        summaries.append(summary)
-        print(f"{name}: {fd['pct_drifted_features']:.0f}% features drifted, "
-              f"amount_psi={summary['amount_psi']:.2f}, pred_psi={summary['prediction_psi']:.2f}, "
-              f"PR-AUC={perf['pr_auc']:.3f}, recall={perf['recall']:.3f}")
+        full_summary = summarize_batch(
+            train,
+            cur,
+            ref_proba,
+            preds,
+            batch_name=name,
+            threshold=threshold,
+            promoted_model_id=promoted_model_id,
+            batch_data_fingerprint=batch_data_fingerprint,
+            params=params,
+        )
+        full_summary["evidently"] = evidently_report(train, cur, DRIFT_DIR / f"{name}.html")
+        write_json(DRIFT_DIR / f"{name}.json", full_summary)
+        _plot_psi(full_summary["per_feature"], name, psi_th, FIGURES_DIR / f"psi_{name}.png")
+        summaries.append({key: value for key, value in full_summary.items() if key != "per_feature"})
+        print(
+            f"{name}: {full_summary['pct_drifted_features']:.0f}% features drifted, "
+            f"amount_psi={full_summary['amount_psi']:.2f}, "
+            f"pred_psi={full_summary['prediction_psi']:.2f}, "
+            f"labels={full_summary['label_status']}"
+        )
 
-    (REPORTS_DIR / "drift_summary.json").write_text(json.dumps(summaries, indent=2))
-    print(f"saved per-batch drift to {DRIFT_DIR} and reports/drift_summary.json"
-          + ("" if evidently_ok else "  (Evidently HTML skipped — native drift only)"))
+    write_json(REPORTS_DIR / "drift_summary.json", summaries)
+    print(f"saved per-batch drift to {DRIFT_DIR} and reports/drift_summary.json")
 
 
 if __name__ == "__main__":

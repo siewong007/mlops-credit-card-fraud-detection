@@ -1,0 +1,515 @@
+schema: '2.0'
+stages:
+  validate:
+    cmd: python -m src.validate
+    deps:
+    - path: data/raw/creditcard.csv
+      hash: md5
+      md5: a6a4a40cef6949dcd101debf8e5548c7
+      size: 45291259
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/ingest.py
+      hash: md5
+      md5: a504c3f5eefe762953e34313562abda6
+      size: 3838
+    - path: src/validate.py
+      hash: md5
+      md5: ba164e676778d3c8b2decf3c3c742907
+      size: 11411
+    params:
+      params.yaml:
+        data:
+          raw_path: data/raw/creditcard.csv
+          batch_dir: data/batches
+          train_frac: 0.5
+          model_valid_frac: 0.1
+          calibration_frac: 0.1
+          n_prod_batches: 3
+          inject_drift: true
+          drift_batch: prod_3
+          drift_amount_scale: 3.0
+          drift_feature_shift: 2.5
+    outs:
+    - path: reports/validation_report.json
+      hash: md5
+      md5: 3411d4ffba61a2952196b41f2bf1676a
+      size: 14199
+  ingest:
+    cmd: python -m src.ingest
+    deps:
+    - path: data/raw/creditcard.csv
+      hash: md5
+      md5: a6a4a40cef6949dcd101debf8e5548c7
+      size: 45291259
+    - path: reports/validation_report.json
+      hash: md5
+      md5: 3411d4ffba61a2952196b41f2bf1676a
+      size: 14199
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/ingest.py
+      hash: md5
+      md5: a504c3f5eefe762953e34313562abda6
+      size: 3838
+    - path: src/validate.py
+      hash: md5
+      md5: ba164e676778d3c8b2decf3c3c742907
+      size: 11411
+    params:
+      params.yaml:
+        data:
+          raw_path: data/raw/creditcard.csv
+          batch_dir: data/batches
+          train_frac: 0.5
+          model_valid_frac: 0.1
+          calibration_frac: 0.1
+          n_prod_batches: 3
+          inject_drift: true
+          drift_batch: prod_3
+          drift_amount_scale: 3.0
+          drift_feature_shift: 2.5
+    outs:
+    - path: data/batches/calibration.csv
+      hash: md5
+      md5: 15831197a38bbca4828b5b2213192227
+      size: 4460948
+    - path: data/batches/model_valid.csv
+      hash: md5
+      md5: 3d8f24dda837e87f32306164e7817c10
+      size: 4454417
+    - path: data/batches/prod_1.csv
+      hash: md5
+      md5: 405a8326ddee0d048dbe916fb4d8b0ed
+      size: 4460471
+    - path: data/batches/prod_2.csv
+      hash: md5
+      md5: b2e938c189d0f315d0e3135b727d0dd9
+      size: 4461079
+    - path: data/batches/prod_3.csv
+      hash: md5
+      md5: 455bc62fc501b2f3c913eba2ffdb38f9
+      size: 4428831
+    - path: data/batches/train.csv
+      hash: md5
+      md5: 65c51c116f63a0e441ecdc7ed73a176c
+      size: 22259622
+  train:
+    cmd: python -m src.train
+    deps:
+    - path: data/batches/model_valid.csv
+      hash: md5
+      md5: 3d8f24dda837e87f32306164e7817c10
+      size: 4454417
+    - path: data/batches/train.csv
+      hash: md5
+      md5: 65c51c116f63a0e441ecdc7ed73a176c
+      size: 22259622
+    - path: data/raw/PROVENANCE.json
+      hash: md5
+      md5: 71f842048a7d09daa844cea93a7c1f83
+      size: 140
+    - path: data/raw/creditcard.csv
+      hash: md5
+      md5: a6a4a40cef6949dcd101debf8e5548c7
+      size: 45291259
+    - path: params.yaml
+      hash: md5
+      md5: 0c2c9237961f0a1f94ab6f72fc6f92d5
+      size: 1876
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/evaluate.py
+      hash: md5
+      md5: a0bf168ebe92920041b1aaa9ff2e31a3
+      size: 5922
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/features.py
+      hash: md5
+      md5: 31406612dd28fa69d1c009c852896d6e
+      size: 1053
+    - path: src/train.py
+      hash: md5
+      md5: 1a948294ed5b988df2b37a0650128c96
+      size: 8078
+    outs:
+    - path: models/model.joblib
+      hash: md5
+      md5: 6f583058f5534e4eee08f45f66061496
+      size: 1535
+    - path: models/scaler.joblib
+      hash: md5
+      md5: cc63c36ce5f39a03cd0edd83bd154c9e
+      size: 879
+    - path: reports/experiment_comparison.json
+      hash: md5
+      md5: 55ab9b67d31fba9d36285e306112c6da
+      size: 1445
+    - path: reports/promotion_record.json
+      hash: md5
+      md5: bca06fa4da0961b61a0d8e833b2ac2c2
+      size: 1045
+  threshold:
+    cmd: python -m src.threshold
+    deps:
+    - path: data/batches/calibration.csv
+      hash: md5
+      md5: 15831197a38bbca4828b5b2213192227
+      size: 4460948
+    - path: models/model.joblib
+      hash: md5
+      md5: 6f583058f5534e4eee08f45f66061496
+      size: 1535
+    - path: models/scaler.joblib
+      hash: md5
+      md5: cc63c36ce5f39a03cd0edd83bd154c9e
+      size: 879
+    - path: reports/promotion_record.json
+      hash: md5
+      md5: bca06fa4da0961b61a0d8e833b2ac2c2
+      size: 1045
+    - path: src/artifacts.py
+      hash: md5
+      md5: 1d5406d3faa9c15e04143d72cc2bffd6
+      size: 1090
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/evaluate.py
+      hash: md5
+      md5: a0bf168ebe92920041b1aaa9ff2e31a3
+      size: 5922
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/features.py
+      hash: md5
+      md5: 31406612dd28fa69d1c009c852896d6e
+      size: 1053
+    - path: src/threshold.py
+      hash: md5
+      md5: 7d2512e6bbb38c6a85c5ffa468c46ddc
+      size: 4777
+    - path: src/validate.py
+      hash: md5
+      md5: ba164e676778d3c8b2decf3c3c742907
+      size: 11411
+    params:
+      params.yaml:
+        threshold:
+          cost_false_negative: 100
+          cost_false_positive: 1
+    outs:
+    - path: models/threshold.json
+      hash: md5
+      md5: 2ad9373314712d4dd78c0698660faf8c
+      size: 593
+    - path: reports/figures/threshold_tradeoff.png
+      hash: md5
+      md5: 6fb8016a6c8d86a29ed65cc238be6f09
+      size: 44391
+    - path: reports/operating_point.json
+      hash: md5
+      md5: 2ad9373314712d4dd78c0698660faf8c
+      size: 593
+  evaluate:
+    cmd: python -m src.evaluate
+    deps:
+    - path: data/batches/calibration.csv
+      hash: md5
+      md5: 15831197a38bbca4828b5b2213192227
+      size: 4460948
+    - path: models/model.joblib
+      hash: md5
+      md5: 6f583058f5534e4eee08f45f66061496
+      size: 1535
+    - path: models/scaler.joblib
+      hash: md5
+      md5: cc63c36ce5f39a03cd0edd83bd154c9e
+      size: 879
+    - path: models/threshold.json
+      hash: md5
+      md5: 2ad9373314712d4dd78c0698660faf8c
+      size: 593
+    - path: src/artifacts.py
+      hash: md5
+      md5: 1d5406d3faa9c15e04143d72cc2bffd6
+      size: 1090
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/evaluate.py
+      hash: md5
+      md5: a0bf168ebe92920041b1aaa9ff2e31a3
+      size: 5922
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/features.py
+      hash: md5
+      md5: 31406612dd28fa69d1c009c852896d6e
+      size: 1053
+    - path: src/validate.py
+      hash: md5
+      md5: ba164e676778d3c8b2decf3c3c742907
+      size: 11411
+    outs:
+    - path: reports/figures/confusion_matrix_default.png
+      hash: md5
+      md5: ddafab2f7c1f50b3fbc877c5d977baa4
+      size: 17580
+    - path: reports/figures/confusion_matrix_operating.png
+      hash: md5
+      md5: d106e7b4f893cbfebed89a2f16bd58bd
+      size: 18620
+    - path: reports/figures/pr_curve.png
+      hash: md5
+      md5: caef0917c1a3e189360b907a8ad535cd
+      size: 18712
+    - path: reports/metrics_default.json
+      hash: md5
+      md5: b9429a060a14a1523f1fd101356c0738
+      size: 481
+    - path: reports/metrics_operating.json
+      hash: md5
+      md5: c81f7bfb762fd94d37924a760ecf5dc4
+      size: 443
+  inference:
+    cmd: python -m src.batch_inference
+    deps:
+    - path: data/batches/prod_1.csv
+      hash: md5
+      md5: 405a8326ddee0d048dbe916fb4d8b0ed
+      size: 4460471
+    - path: data/batches/prod_2.csv
+      hash: md5
+      md5: b2e938c189d0f315d0e3135b727d0dd9
+      size: 4461079
+    - path: data/batches/prod_3.csv
+      hash: md5
+      md5: 455bc62fc501b2f3c913eba2ffdb38f9
+      size: 4428831
+    - path: models/model.joblib
+      hash: md5
+      md5: 6f583058f5534e4eee08f45f66061496
+      size: 1535
+    - path: models/scaler.joblib
+      hash: md5
+      md5: cc63c36ce5f39a03cd0edd83bd154c9e
+      size: 879
+    - path: models/threshold.json
+      hash: md5
+      md5: 2ad9373314712d4dd78c0698660faf8c
+      size: 593
+    - path: reports/promotion_record.json
+      hash: md5
+      md5: bca06fa4da0961b61a0d8e833b2ac2c2
+      size: 1045
+    - path: src/artifacts.py
+      hash: md5
+      md5: 1d5406d3faa9c15e04143d72cc2bffd6
+      size: 1090
+    - path: src/batch_inference.py
+      hash: md5
+      md5: a0382fbb95e065260460c354b046fd83
+      size: 2458
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/features.py
+      hash: md5
+      md5: 31406612dd28fa69d1c009c852896d6e
+      size: 1053
+    - path: src/validate.py
+      hash: md5
+      md5: ba164e676778d3c8b2decf3c3c742907
+      size: 11411
+    outs:
+    - path: data/batches/preds_prod_1.csv
+      hash: md5
+      md5: e2127a58e36636975a3baf770a9746aa
+      size: 1074756
+    - path: data/batches/preds_prod_2.csv
+      hash: md5
+      md5: f619b1220800e35fa34aab5692e73678
+      size: 1074807
+    - path: data/batches/preds_prod_3.csv
+      hash: md5
+      md5: f6cc45a2e6ffc7f1e3baa09317cd936d
+      size: 1078510
+  drift:
+    cmd: python -m src.drift
+    deps:
+    - path: data/batches/calibration.csv
+      hash: md5
+      md5: 15831197a38bbca4828b5b2213192227
+      size: 4460948
+    - path: data/batches/preds_prod_1.csv
+      hash: md5
+      md5: e2127a58e36636975a3baf770a9746aa
+      size: 1074756
+    - path: data/batches/preds_prod_2.csv
+      hash: md5
+      md5: f619b1220800e35fa34aab5692e73678
+      size: 1074807
+    - path: data/batches/preds_prod_3.csv
+      hash: md5
+      md5: f6cc45a2e6ffc7f1e3baa09317cd936d
+      size: 1078510
+    - path: data/batches/prod_1.csv
+      hash: md5
+      md5: 405a8326ddee0d048dbe916fb4d8b0ed
+      size: 4460471
+    - path: data/batches/prod_2.csv
+      hash: md5
+      md5: b2e938c189d0f315d0e3135b727d0dd9
+      size: 4461079
+    - path: data/batches/prod_3.csv
+      hash: md5
+      md5: 455bc62fc501b2f3c913eba2ffdb38f9
+      size: 4428831
+    - path: data/batches/train.csv
+      hash: md5
+      md5: 65c51c116f63a0e441ecdc7ed73a176c
+      size: 22259622
+    - path: models/model.joblib
+      hash: md5
+      md5: 6f583058f5534e4eee08f45f66061496
+      size: 1535
+    - path: models/scaler.joblib
+      hash: md5
+      md5: cc63c36ce5f39a03cd0edd83bd154c9e
+      size: 879
+    - path: models/threshold.json
+      hash: md5
+      md5: 2ad9373314712d4dd78c0698660faf8c
+      size: 593
+    - path: src/artifacts.py
+      hash: md5
+      md5: 1d5406d3faa9c15e04143d72cc2bffd6
+      size: 1090
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/drift.py
+      hash: md5
+      md5: b3178a6cf1a83f2931de3e83897d4647
+      size: 11784
+    - path: src/evaluate.py
+      hash: md5
+      md5: a0bf168ebe92920041b1aaa9ff2e31a3
+      size: 5922
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/features.py
+      hash: md5
+      md5: 31406612dd28fa69d1c009c852896d6e
+      size: 1053
+    - path: src/validate.py
+      hash: md5
+      md5: ba164e676778d3c8b2decf3c3c742907
+      size: 11411
+    params:
+      params.yaml:
+        drift:
+          psi_threshold: 0.2
+          ks_pvalue: 0.05
+        threshold:
+          cost_false_negative: 100
+          cost_false_positive: 1
+    outs:
+    - path: reports/drift/prod_1.json
+      hash: md5
+      md5: 77747b782e4964c9694aff50f9d25d34
+      size: 3296
+    - path: reports/drift/prod_2.json
+      hash: md5
+      md5: d6b689898d91247ce7c7596362f44620
+      size: 3330
+    - path: reports/drift/prod_3.json
+      hash: md5
+      md5: c2d96b4b099a506c04c7190ba324f32b
+      size: 3267
+    - path: reports/drift_summary.json
+      hash: md5
+      md5: 846d7774cdcbd4c6b6a9cbc9690ea7ae
+      size: 2125
+    - path: reports/figures/psi_prod_1.png
+      hash: md5
+      md5: 581f9b560a84b85eb6c41d75094585e6
+      size: 22916
+    - path: reports/figures/psi_prod_2.png
+      hash: md5
+      md5: 6df400681a71244202ffde3fbc016e1c
+      size: 23060
+    - path: reports/figures/psi_prod_3.png
+      hash: md5
+      md5: 8c73a4d8c5725629bdfa7f61a14c54b7
+      size: 21201
+  trigger:
+    cmd: python -m src.retrain_trigger
+    deps:
+    - path: reports/drift_summary.json
+      hash: md5
+      md5: 846d7774cdcbd4c6b6a9cbc9690ea7ae
+      size: 2125
+    - path: reports/operating_point.json
+      hash: md5
+      md5: 2ad9373314712d4dd78c0698660faf8c
+      size: 593
+    - path: src/config.py
+      hash: md5
+      md5: 1feada43f632faace39521b2890b1c08
+      size: 2192
+    - path: src/evidence.py
+      hash: md5
+      md5: b90b7ac91875448fb33fca5df0676cd4
+      size: 3909
+    - path: src/retrain_trigger.py
+      hash: md5
+      md5: b22b14dceb986049639bd0994b707e2b
+      size: 8217
+    params:
+      params.yaml:
+        trigger:
+          pr_auc_drop_pct: 10
+          recall_floor: 0.75
+          drifted_features_pct: 50
+    outs:
+    - path: reports/trigger_decisions.json
+      hash: md5
+      md5: dc15f6a4eee12030c7e7ee91dd0ce9d3
+      size: 2041
+    - path: reports/trigger_log.md
+      hash: md5
+      md5: 5738caca363026c3e4e27ae52af118a5
+      size: 885

@@ -1,0 +1,32 @@
+{
+  "data": {
+    "fingerprint_sha256": "1700322b377ac8340ab6b75f22b974944fbcaf5b4f0daf3d5e8f620d96313026",
+    "fraud": 492,
+    "fraud_rate": 0.001727,
+    "rows": 284807,
+    "source": "REAL \u2014 ULB creditcard via OpenML dataset 1597"
+  },
+  "dependencies": {
+    "dvc": "3.67.1",
+    "evidently": "0.7.21",
+    "joblib": "1.5.2",
+    "matplotlib": "3.10.6",
+    "mlflow": "3.14.0",
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "pandera": "0.32.1",
+    "pyarrow": "21.0.0",
+    "pytest": "8.4.2",
+    "pyyaml": "6.0.3",
+    "scikit-learn": "1.7.2",
+    "scipy": "1.16.3",
+    "xgboost": "3.3.0"
+  },
+  "parameters": {
+    "fingerprint_sha256": "e9e840bf9d2d828f0555a929dfccbfda6bbddc2fd57a38050709d85c9d8c59be",
+    "path": "params.yaml"
+  },
+  "python_version": "3.13.9",
+  "schema_version": 1,
+  "source_commit": "36b76a01d5c028f530b2cd2014c8b2d28f87ec31"
+}

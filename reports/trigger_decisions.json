@@ -1,0 +1,77 @@
+{
+  "baseline": {
+    "operating_threshold": 0.98,
+    "pr_auc": 0.6033066337523458,
+    "promoted_model_id": "fraud-detector:v1"
+  },
+  "decisions": [
+    {
+      "batch": "prod_1",
+      "label_status": "available",
+      "observed": {
+        "batch_data_fingerprint": "b85d95b4ae7cccab3f7df22ccfeea108fd267b14b93d0769a8dc876dd8d81167",
+        "operating_threshold": 0.98,
+        "pct_drifted_features": 37.9,
+        "pr_auc": 0.8099279516362043,
+        "promoted_model_id": "fraud-detector:v1",
+        "recall": 0.8181818181818182
+      },
+      "reason_codes": [
+        "FEATURE_DRIFT_WARNING"
+      ],
+      "reasons": [
+        "37.9% feature drift is in the warning band"
+      ],
+      "status": "warning"
+    },
+    {
+      "batch": "prod_2",
+      "label_status": "available",
+      "observed": {
+        "batch_data_fingerprint": "306dd582232cb2d228da989a9505e556b9e8266a31f852c93a773a712806f5eb",
+        "operating_threshold": 0.98,
+        "pct_drifted_features": 41.4,
+        "pr_auc": 0.8353665684036601,
+        "promoted_model_id": "fraud-detector:v1",
+        "recall": 0.8490566037735849
+      },
+      "reason_codes": [
+        "FEATURE_DRIFT_WARNING"
+      ],
+      "reasons": [
+        "41.4% feature drift is in the warning band"
+      ],
+      "status": "warning"
+    },
+    {
+      "batch": "prod_3",
+      "label_status": "available",
+      "observed": {
+        "batch_data_fingerprint": "4483f420ef000eac5317fcc102a1e6f6f7f69847962b9e4a76d897f60e3bfdd8",
+        "operating_threshold": 0.98,
+        "pct_drifted_features": 58.6,
+        "pr_auc": 0.08812109166011617,
+        "promoted_model_id": "fraud-detector:v1",
+        "recall": 0.5454545454545454
+      },
+      "reason_codes": [
+        "PR_AUC_DROP",
+        "RECALL_BELOW_FLOOR",
+        "FEATURE_DRIFT_RETRAIN"
+      ],
+      "reasons": [
+        "PR-AUC drop 85.4% exceeds 10%",
+        "recall 0.545 is below 0.75",
+        "58.6% feature drift exceeds 50%"
+      ],
+      "status": "retrain"
+    }
+  ],
+  "overall_status": "retrain",
+  "thresholds": {
+    "pr_auc_drop_pct": 10.0,
+    "recall_floor": 0.75,
+    "retrain_drift_pct": 50.0,
+    "warning_drift_pct": 25.0
+  }
+}

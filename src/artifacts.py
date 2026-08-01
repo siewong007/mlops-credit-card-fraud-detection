@@ -9,10 +9,10 @@ import json
 
 import joblib
 
-from src.config import MODELS_DIR
+from src.config import MODELS_DIR, REPORTS_DIR
+from src.evidence import write_json
 
 _MODEL_PATH = MODELS_DIR / "model.joblib"
-_BASELINE_PATH = MODELS_DIR / "baseline.json"
 _THRESHOLD_PATH = MODELS_DIR / "threshold.json"
 
 
@@ -22,13 +22,9 @@ def load_model():
     return joblib.load(_MODEL_PATH)
 
 
-def load_baseline() -> dict:
-    return json.loads(_BASELINE_PATH.read_text())
-
-
-def save_threshold(payload: dict) -> None:
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    _THRESHOLD_PATH.write_text(json.dumps(payload, indent=2))
+def save_operating_point(payload: dict) -> None:
+    write_json(_THRESHOLD_PATH, payload)
+    write_json(REPORTS_DIR / "operating_point.json", payload)
 
 
 def load_threshold() -> dict:

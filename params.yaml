@@ -3,7 +3,8 @@ data:
   batch_dir: data/batches
   # Time-based split fractions (no random-only splitting)
   train_frac: 0.5
-  valid_frac: 0.2
+  model_valid_frac: 0.1
+  calibration_frac: 0.1
   n_prod_batches: 3
   # Inject a shifted production batch to demonstrate the drift + retraining
   # trigger firing (clearly labelled simulation; briefing SS10/SS13 allow this).
@@ -25,6 +26,7 @@ train:
   models: [logistic_regression, xgboost]
   class_weight: balanced
   random_state: 42
+  n_jobs: 1
 
 threshold:
   # business costs used for cost-based threshold selection

@@ -1,61 +1,130 @@
-# DVC pipeline — the same reorganised workflow as the Makefile, but with
-# dependency tracking and one-command reproduction: `dvc repro`.
-#
-# Setup once:  dvc init  &&  dvc add data/raw/creditcard.csv
-# (For dev without the real dataset, `make data` writes a synthetic CSV first.)
-#
-# Model artefacts are dvc-cached (binary, gitignored); human-readable evidence
-# uses `cache: false` so it stays versioned in git alongside the code.
+# The raw dataset is an INPUT to this graph, never an output. DVC deletes a
+# stage's declared outputs before running it, so a `data` stage that generated
+# data/raw/creditcard.csv would erase a real ULB dataset on any `dvc repro` —
+# unrecoverably, since that file is gitignored and no DVC remote is configured.
+# Seed the input first (`make data`, or `make fetch-data` for the real thing);
+# its hash is recorded as a dependency, which pins lineage just as precisely.
 stages:
+  validate:
+    cmd: python -m src.validate
+    deps:
+      - src/validate.py
+      - src/ingest.py
+      - src/config.py
+      - src/evidence.py
+      - data/raw/creditcard.csv
+    params:
+      - data
+    outs:
+      - reports/validation_report.json:
+          cache: false
+
   ingest:
     cmd: python -m src.ingest
-    deps: [src/ingest.py, src/config.py, data/raw/creditcard.csv]
-    params: [data]
+    deps:
+      - src/ingest.py
+      - src/validate.py
+      - src/config.py
+      - src/evidence.py
+      - reports/validation_report.json
+      - data/raw/creditcard.csv
+    params:
+      - data
     outs:
       - data/batches/train.csv
-      - data/batches/valid.csv
+      - data/batches/model_valid.csv
+      - data/batches/calibration.csv
       - data/batches/prod_1.csv
       - data/batches/prod_2.csv
       - data/batches/prod_3.csv
 
-  validate:
-    cmd: python -m src.validate
-    deps: [src/validate.py, data/raw/creditcard.csv]
-
   train:
     cmd: python -m src.train
-    deps: [src/train.py, src/features.py, src/evaluate.py,
-           data/batches/train.csv, data/batches/valid.csv]
-    params: [train]
-    outs: [models/model.joblib, models/scaler.joblib, models/baseline.json]
+    deps:
+      - src/train.py
+      - src/features.py
+      - src/evaluate.py
+      - src/config.py
+      - src/evidence.py
+      - data/batches/train.csv
+      - data/batches/model_valid.csv
+      - data/raw/creditcard.csv
+      - data/raw/PROVENANCE.json
+      - params.yaml
+    outs:
+      - models/model.joblib
+      - models/scaler.joblib
+      - reports/experiment_comparison.json:
+          cache: false
+      - reports/promotion_record.json:
+          cache: false
 
   threshold:
     cmd: python -m src.threshold
-    deps: [src/threshold.py, models/model.joblib, models/scaler.joblib,
-           data/batches/valid.csv]
-    params: [threshold]
+    deps:
+      - src/threshold.py
+      - src/artifacts.py
+      - src/features.py
+      - src/evaluate.py
+      - src/validate.py
+      - src/config.py
+      - src/evidence.py
+      - models/model.joblib
+      - models/scaler.joblib
+      - reports/promotion_record.json
+      - data/batches/calibration.csv
+    params:
+      - threshold
     outs:
       - models/threshold.json
+      - reports/operating_point.json:
+          cache: false
+    plots:
       - reports/figures/threshold_tradeoff.png:
           cache: false
 
   evaluate:
     cmd: python -m src.evaluate
-    deps: [src/evaluate.py, models/model.joblib, models/scaler.joblib,
-           data/batches/valid.csv]
-    outs:
-      - reports/figures/confusion_matrix.png:
+    deps:
+      - src/evaluate.py
+      - src/artifacts.py
+      - src/features.py
+      - src/validate.py
+      - src/config.py
+      - src/evidence.py
+      - models/model.joblib
+      - models/scaler.joblib
+      - models/threshold.json
+      - data/batches/calibration.csv
+    metrics:
+      - reports/metrics_default.json:
+          cache: false
+      - reports/metrics_operating.json:
+          cache: false
+    plots:
+      - reports/figures/confusion_matrix_default.png:
+          cache: false
+      - reports/figures/confusion_matrix_operating.png:
           cache: false
       - reports/figures/pr_curve.png:
-          cache: false
-    metrics:
-      - reports/metrics_valid.json:
           cache: false
 
   inference:
     cmd: python -m src.batch_inference
-    deps: [src/batch_inference.py, models/model.joblib, models/threshold.json,
-           data/batches/prod_1.csv, data/batches/prod_2.csv, data/batches/prod_3.csv]
+    deps:
+      - src/batch_inference.py
+      - src/artifacts.py
+      - src/features.py
+      - src/validate.py
+      - src/config.py
+      - src/evidence.py
+      - models/model.joblib
+      - models/scaler.joblib
+      - models/threshold.json
+      - reports/promotion_record.json
+      - data/batches/prod_1.csv
+      - data/batches/prod_2.csv
+      - data/batches/prod_3.csv
     outs:
       - data/batches/preds_prod_1.csv
       - data/batches/preds_prod_2.csv
@@ -63,19 +132,58 @@ stages:
 
   drift:
     cmd: python -m src.drift
-    deps: [src/drift.py, models/model.joblib, models/scaler.joblib,
-           data/batches/train.csv, data/batches/valid.csv,
-           data/batches/preds_prod_1.csv, data/batches/preds_prod_2.csv,
-           data/batches/preds_prod_3.csv]
-    params: [drift]
+    deps:
+      - src/drift.py
+      - src/artifacts.py
+      - src/features.py
+      - src/evaluate.py
+      - src/validate.py
+      - src/config.py
+      - src/evidence.py
+      - models/model.joblib
+      - models/scaler.joblib
+      - models/threshold.json
+      - data/batches/train.csv
+      - data/batches/calibration.csv
+      - data/batches/prod_1.csv
+      - data/batches/prod_2.csv
+      - data/batches/prod_3.csv
+      - data/batches/preds_prod_1.csv
+      - data/batches/preds_prod_2.csv
+      - data/batches/preds_prod_3.csv
+    params:
+      - drift
+      - threshold
+    outs:
+      - reports/drift/prod_1.json:
+          cache: false
+      - reports/drift/prod_2.json:
+          cache: false
+      - reports/drift/prod_3.json:
+          cache: false
     metrics:
       - reports/drift_summary.json:
+          cache: false
+    plots:
+      - reports/figures/psi_prod_1.png:
+          cache: false
+      - reports/figures/psi_prod_2.png:
+          cache: false
+      - reports/figures/psi_prod_3.png:
           cache: false
 
   trigger:
     cmd: python -m src.retrain_trigger
-    deps: [src/retrain_trigger.py, reports/drift_summary.json, models/baseline.json]
-    params: [trigger]
+    deps:
+      - src/retrain_trigger.py
+      - src/config.py
+      - src/evidence.py
+      - reports/drift_summary.json
+      - reports/operating_point.json
+    params:
+      - trigger
     outs:
+      - reports/trigger_decisions.json:
+          cache: false
       - reports/trigger_log.md:
           cache: false

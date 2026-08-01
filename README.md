@@ -15,10 +15,10 @@ maps to an operational requirement, not to a higher accuracy score.
 ## Pipeline
 
 ```
-Ingest (time-based batches) → Validate (Pandera) → Feature processing →
-Train ≥2 experiments + track (MLflow) → Evaluate (imbalance-aware) →
-Threshold selection (cost-based) → Register (MLflow registry) →
-Batch inference → Drift monitoring (KS/PSI + Evidently) → Retraining trigger
+Validate raw data (Pandera) → Ingest six chronological slices →
+Feature processing → Train ≥2 experiments + promote (MLflow) →
+Select operating threshold (cost-based) → Evaluate default/operating views →
+Batch inference → Drift monitoring (KS/PSI + Evidently) → Review decision
 ```
 
 ## Setup
@@ -33,19 +33,22 @@ pip install -r requirements.txt
 - **Real data (recommended):** `make fetch-data` downloads the genuine ULB
   dataset from its open OpenML mirror — **no Kaggle account needed**. (Or drop a
   Kaggle `creditcard.csv` into `data/raw/` yourself.)
-- **Synthetic (offline/CI fallback):** do nothing — `make pipeline` generates a
-  clearly-labelled synthetic dataset with the identical schema so the pipeline
-  runs out of the box. See [notebooks/README.md](notebooks/README.md) §"data".
+- **Synthetic (offline/CI fallback):** in a clean clone with no raw CSV,
+  `make verify` generates a clearly-labelled deterministic dataset with the
+  identical schema. See [notebooks/README.md](notebooks/README.md) §"data".
 
 ## Run
 
 ```bash
-make fetch-data   # download the real ULB dataset from OpenML (run once)
-make pipeline     # full workflow: (data) → ingest → validate → train →
-                  # threshold → evaluate → inference → drift → trigger
-make dashboard    # render the monitoring dashboard into site/
-make test         # unit tests (pytest)
-make clean        # remove generated artefacts (models/, reports/, batches, site/)
+# Complete verification; uses an existing real CSV or generates synthetic data
+SOURCE_COMMIT="$(git rev-parse HEAD)" make verify
+
+# Authoritative real-data path
+make fetch-data
+SOURCE_COMMIT="$(git rev-parse HEAD)" make verify
+
+# Fast evidence-independent tests
+make test-fast
 ```
 
 Inspect the tracked experiments and the registered model:
@@ -54,16 +57,25 @@ Inspect the tracked experiments and the registered model:
 mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
 
-Reproduce via DVC instead of Make (after `dvc init && dvc add data/raw/creditcard.csv`):
+Verify the DVC lineage safely:
 
 ```bash
-dvc repro
+make verify-dvc
 ```
 
-Or run the whole thing in a pinned container:
+This archives the exact committed snapshot into a disposable clone and
+reproduces deterministic synthetic lineage there. No DVC remote is configured
+for the real dataset, and the verifier never tracks or overwrites the caller's
+real CSV.
+
+Run the same verification contract in the pinned container:
 
 ```bash
-docker build -t fraud-mlops . && docker run --rm fraud-mlops
+docker build --build-arg SOURCE_COMMIT="$(git rev-parse HEAD)" \
+  --tag fraud-mlops:verify .
+test "$(docker run --rm --entrypoint python fraud-mlops:verify --version)" \
+  = "Python 3.13.9"
+docker run --rm fraud-mlops:verify
 ```
 
 ## Automated monitoring (scheduled) & live dashboard
@@ -77,7 +89,7 @@ workflow*):
 
 1. fetches the real ULB dataset from OpenML — falling back to the synthetic
    generator if OpenML is unreachable,
-2. runs the full pipeline (score batches → drift → retraining trigger),
+2. runs the complete verification contract,
 3. publishes the trigger table to the run summary and raises a workflow
    **warning annotation** if any batch meets the retrain criteria,
 4. uploads the evidence as a build artefact, and
@@ -88,23 +100,22 @@ never be mistaken for real ones. Build it locally with `make dashboard`.
 
 ## What you get (evidence)
 
-After `make pipeline`, `reports/` contains the testing & monitoring evidence:
+After `SOURCE_COMMIT="$(git rev-parse HEAD)" make verify`, `reports/` contains
+the generated evidence contracts:
 
 | Artefact | What it shows | Requirement |
 |----------|---------------|-------------|
-| `reports/metrics_valid.json` + `figures/confusion_matrix.png`, `figures/pr_curve.png` | Imbalance-aware evaluation of the promoted model | 3 |
-| `reports/figures/threshold_tradeoff.png` + `models/threshold.json` | Cost-based threshold selection (FN≫FP) | 4 |
-| `reports/drift/*.json`, `figures/psi_*.png`, `reports/drift/*.html` | Per-batch drift (KS/PSI, prediction, performance) | 2 |
-| `reports/drift_summary.json` | Machine-readable monitoring summary | 2 |
-| `reports/trigger_log.md` | Retraining decision per batch, with reasons | 8 |
+| `reports/validation_report.json` | Required raw/development data validation gate | 6 |
+| `reports/experiment_comparison.json` + `reports/promotion_record.json` | Candidate comparison and promoted MLflow identity | 7 |
+| `reports/operating_point.json` + `reports/metrics_operating.json` + `reports/figures/threshold_tradeoff.png` + `reports/figures/pr_curve.png` | Primary calibrated operating point and evaluation | 3, 4 |
+| `reports/metrics_default.json` + `reports/figures/confusion_matrix_default.png` + `reports/figures/confusion_matrix_operating.png` | Threshold 0.5 comparison against the operating view | 3, 4 |
+| `reports/drift/*.json` + `reports/drift_summary.json` | Native per-batch drift and label-aware performance evidence | 2 |
+| `reports/trigger_decisions.json` + `reports/trigger_log.md` | Structured human-review decision and reasons | 8 |
+| `reports/run_manifest.json` | Source commit, runtime, provenance, and fingerprints | 5 |
 | MLflow (`mlflow.db`) | Two tracked runs + registered `fraud-detector` | 7 |
 
-On the real data, `prod_1`/`prod_2` raise a **warning** (the dataset naturally
-drifts ~40% of features across its 2-day window, but performance stays healthy)
-while the drift-injected `prod_3` trips a **retrain** (PR-AUC −89%, recall 0.55 <
-floor, 59% features drifted) — the intended monitoring demonstration. See the
-report §8 for the full analysis, including why we flag drift on PSI (not the
-KS p-value, which over-fires at this scale).
+Authoritative real-data values are added only after the technical freeze and
+verified real-data evidence run.
 
 ## Tools and why
 
@@ -117,21 +128,21 @@ KS p-value, which over-fires at this scale).
 | Evidently | Rich HTML drift reports (best-effort) | `src/drift.py` |
 | XGBoost + scikit-learn | The ≥2 model experiments | `src/train.py` |
 | Docker | Reproducible runtime | `Dockerfile` |
-| DVC | Data/artefact versioning + `dvc repro` | `dvc.yaml` |
+| DVC | Disposable synthetic lineage, parameters, hashes, metrics, and plots | `dvc.yaml`, `make verify-dvc` |
 | Pytest + GitHub Actions | Automated tests + full-pipeline CI | `tests/`, `.github/` |
 
 ## Repo structure
 
 ```
 src/            pipeline stages + fetch_data.py (real) / simulate_data.py (synthetic)
-tests/          pytest unit tests (13, run in CI)
+tests/          pytest unit, integration, and evidence-consistency gates
 data/           raw data + time-based batches (gitignored, regenerated)
 notebooks/      baseline Kaggle notebook acknowledgement
-reports/        committed evidence: metrics, figures, drift summaries, trigger log
+reports/        generated JSON/figure evidence contracts
 docs/           report, diagrams, demo script, reflection template
 models/         promoted model bundle (gitignored, regenerated)
 params.yaml     all knobs: split fractions, models, costs, drift & trigger thresholds
-Makefile        stage orchestration                dvc.yaml   DVC pipeline
+Makefile        stage orchestration                dvc.yaml   synthetic lineage graph
 Dockerfile      pinned runtime                     requirements.txt  pinned deps
 ```
 
@@ -139,12 +150,12 @@ Dockerfile      pinned runtime                     requirements.txt  pinned deps
 
 Every knob lives in `params.yaml` (split fractions, model list, business costs,
 drift/trigger thresholds, synthetic-data settings). Reproducibility rests on
-pinned dependencies, fixed seeds, a single-command pipeline, DVC-tracked data,
-a Docker image, and CI that runs the whole workflow on every push.
+pinned dependencies, fixed seeds, the shared `make verify` contract, disposable
+DVC lineage verification, the pinned Docker image, and CI.
 
 ## Academic integrity
 
-Per briefing §18: the baseline notebook is acknowledged, AI assistance is
-disclosed, and all results were verified by running the pipeline. The synthetic
-dataset is clearly labelled wherever it appears; it demonstrates the *workflow*,
-and the real Kaggle CSV drops in unchanged for submission-grade numbers.
+Per briefing §18: the baseline notebook is acknowledged and AI assistance is
+disclosed. Submitted results must be checked against the authoritative real-data
+evidence run. The synthetic dataset is clearly labelled wherever it appears and
+demonstrates the *workflow*, never real-data performance.

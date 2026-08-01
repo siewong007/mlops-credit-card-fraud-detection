@@ -1,160 +1,171 @@
 {
-  "batch": "prod_1",
-  "n_rows": 28481,
-  "pct_drifted_features": 37.9,
-  "n_drifted": 11,
   "amount_psi": 0.0037,
-  "prediction_psi": 0.0051,
-  "fraud_rate": 0.00116,
-  "baseline_fraud_rate": 0.00189,
-  "pr_auc": 0.809927985953572,
-  "recall": 0.8181818181818182,
-  "precision": 0.32926829268292684,
+  "baseline_target_rate": 0.0018890051473634685,
+  "batch": "prod_1",
+  "batch_data_fingerprint": "b85d95b4ae7cccab3f7df22ccfeea108fd267b14b93d0769a8dc876dd8d81167",
+  "estimated_business_cost": 655.0,
+  "evidently": {
+    "error_type": null,
+    "message": null,
+    "status": "generated"
+  },
+  "label_status": "available",
+  "n_drifted": 11,
+  "n_rows": 28481,
+  "operating_threshold": 0.98,
+  "pct_drifted_features": 37.9,
   "per_feature": {
+    "Amount": {
+      "drifted": false,
+      "ks_pvalue": 0.0,
+      "psi": 0.0037
+    },
     "V1": {
-      "psi": 1.5257,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
-    },
-    "V2": {
-      "psi": 0.0357,
-      "ks_pvalue": 0.0,
-      "drifted": false
-    },
-    "V3": {
-      "psi": 1.546,
-      "ks_pvalue": 0.0,
-      "drifted": true
-    },
-    "V4": {
-      "psi": 0.19,
-      "ks_pvalue": 0.0,
-      "drifted": false
-    },
-    "V5": {
-      "psi": 0.3313,
-      "ks_pvalue": 0.0,
-      "drifted": true
-    },
-    "V6": {
-      "psi": 0.0914,
-      "ks_pvalue": 0.0,
-      "drifted": false
-    },
-    "V7": {
-      "psi": 0.1689,
-      "ks_pvalue": 0.0,
-      "drifted": false
-    },
-    "V8": {
-      "psi": 0.1473,
-      "ks_pvalue": 0.0,
-      "drifted": false
-    },
-    "V9": {
-      "psi": 0.0421,
-      "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 1.5256
     },
     "V10": {
-      "psi": 0.0858,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0858
     },
     "V11": {
-      "psi": 0.4595,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 0.4595
     },
     "V12": {
-      "psi": 0.0652,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0652
     },
     "V13": {
-      "psi": 0.022,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0221
     },
     "V14": {
-      "psi": 0.0673,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0673
     },
     "V15": {
-      "psi": 0.3827,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 0.3826
     },
     "V16": {
-      "psi": 0.0091,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0091
     },
     "V17": {
-      "psi": 0.0486,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0486
     },
     "V18": {
-      "psi": 0.0502,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0502
     },
     "V19": {
-      "psi": 0.0219,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.0219
+    },
+    "V2": {
+      "drifted": false,
+      "ks_pvalue": 0.0,
+      "psi": 0.0356
     },
     "V20": {
-      "psi": 0.1053,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.1052
     },
     "V21": {
-      "psi": 0.2107,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 0.2108
     },
     "V22": {
-      "psi": 0.3656,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 0.3657
     },
     "V23": {
-      "psi": 0.2177,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 0.2176
     },
     "V24": {
-      "psi": 0.2038,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 0.2038
     },
     "V25": {
-      "psi": 0.4193,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 0.4192
     },
     "V26": {
-      "psi": 0.1957,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.1957
     },
     "V27": {
-      "psi": 0.091,
+      "drifted": false,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 0.091
     },
     "V28": {
-      "psi": 1.0375,
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": true
+      "psi": 1.0375
     },
-    "Amount": {
-      "psi": 0.0037,
+    "V3": {
+      "drifted": true,
       "ks_pvalue": 0.0,
-      "drifted": false
+      "psi": 1.5458
+    },
+    "V4": {
+      "drifted": false,
+      "ks_pvalue": 0.0,
+      "psi": 0.1899
+    },
+    "V5": {
+      "drifted": true,
+      "ks_pvalue": 0.0,
+      "psi": 0.3313
+    },
+    "V6": {
+      "drifted": false,
+      "ks_pvalue": 0.0,
+      "psi": 0.0914
+    },
+    "V7": {
+      "drifted": false,
+      "ks_pvalue": 0.0,
+      "psi": 0.1689
+    },
+    "V8": {
+      "drifted": false,
+      "ks_pvalue": 0.0,
+      "psi": 0.1473
+    },
+    "V9": {
+      "drifted": false,
+      "ks_pvalue": 0.0,
+      "psi": 0.0421
     }
-  }
+  },
+  "pr_auc": 0.8099279516362043,
+  "precision": 0.32926829268292684,
+  "prediction_psi": 0.0016,
+  "promoted_model_id": "fraud-detector:v1",
+  "recall": 0.8181818181818182,
+  "target_rate": 0.0011586671816298584,
+  "target_rate_delta": -0.00073033796573361
 }

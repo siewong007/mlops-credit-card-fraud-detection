@@ -9,20 +9,49 @@ from src.config import ROOT, batch_dir, load_params
 
 _SIGNAL_COMPONENTS = [4, 10, 11, 12, 14, 17]  # kept in sync with simulate_data
 
+DEVELOPMENT_SPLIT_NAMES = ("train", "model_valid", "calibration")
+
+
+def split_names(n_prod_batches: int) -> tuple[str, ...]:
+    """Return the ordered slice names for ``n_prod_batches`` production batches."""
+    return (
+        *DEVELOPMENT_SPLIT_NAMES,
+        *(f"prod_{index}" for index in range(1, n_prod_batches + 1)),
+    )
+
+
+# The default configuration; `split_names` is the source of truth for any other
+# `n_prod_batches`, which params.yaml documents as configurable.
+SPLIT_NAMES = split_names(3)
+
 
 def split_by_time(df: pd.DataFrame, params: dict) -> dict[str, pd.DataFrame]:
-    """Sort by Time; return train / valid / prod_1..N slices (disjoint, ordered)."""
-    df = df.sort_values("Time").reset_index(drop=True)
-    n = len(df)
-    p = params["data"]
-    t_end = int(n * p["train_frac"])
-    v_end = t_end + int(n * p["valid_frac"])
-    out = {"train": df.iloc[:t_end], "valid": df.iloc[t_end:v_end]}
-    prod = df.iloc[v_end:]
-    k = p["n_prod_batches"]
-    for i in range(k):
-        out[f"prod_{i + 1}"] = prod.iloc[i * len(prod) // k : (i + 1) * len(prod) // k]
-    return out
+    """Return stable time-ordered, disjoint slices that preserve every row."""
+    ordered = df.sort_values("Time", kind="stable").reset_index(drop=True)
+    n_rows = len(ordered)
+    data_params = params["data"]
+    train_end = int(n_rows * data_params["train_frac"])
+    model_valid_end = train_end + int(n_rows * data_params["model_valid_frac"])
+    calibration_end = model_valid_end + int(n_rows * data_params["calibration_frac"])
+    parts = {
+        "train": ordered.iloc[:train_end],
+        "model_valid": ordered.iloc[train_end:model_valid_end],
+        "calibration": ordered.iloc[model_valid_end:calibration_end],
+    }
+    production = ordered.iloc[calibration_end:]
+    n_batches = data_params["n_prod_batches"]
+    if n_batches < 1:
+        raise ValueError(f"n_prod_batches must be at least 1, got {n_batches}")
+    for index in range(n_batches):
+        start = index * len(production) // n_batches
+        end = (index + 1) * len(production) // n_batches
+        parts[f"prod_{index + 1}"] = production.iloc[start:end]
+    expected = split_names(n_batches)
+    if tuple(parts) != expected:
+        raise ValueError(f"split produced {tuple(parts)}, expected {expected}")
+    if sum(map(len, parts.values())) != n_rows:
+        raise ValueError("time split did not preserve the complete dataset")
+    return {name: frame.copy().reset_index(drop=True) for name, frame in parts.items()}
 
 
 def inject_drift(batch: pd.DataFrame, params: dict) -> pd.DataFrame:
@@ -52,8 +81,15 @@ def inject_drift(batch: pd.DataFrame, params: dict) -> pd.DataFrame:
 
 
 def main() -> None:
+    from src.validate import read_stable_csv, require_validation_gate
+
     params = load_params()
-    df = pd.read_csv(ROOT / params["data"]["raw_path"])
+    raw_path = ROOT / params["data"]["raw_path"]
+    report = require_validation_gate(raw_path, params)
+    df, _ = read_stable_csv(
+        raw_path,
+        expected_sha256=report["raw_data_fingerprint"],
+    )
     parts = split_by_time(df, params)
 
     inject = params["data"].get("inject_drift", False)
