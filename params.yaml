@@ -45,3 +45,8 @@ trigger:
   # (PSI>0.2) across its 2-day window, so we flag only ABNORMAL drift above that.
   # (For the synthetic dataset, lower this to ~25 to make the drift arm fire.)
   drifted_features_pct: 50   # retrain if >50% of features drift
+
+explain:
+    sample_size: 2000
+    top_k: 15
+    seed: 42

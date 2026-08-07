@@ -1,19 +1,19 @@
 {
   "baseline": {
     "operating_threshold": 0.98,
-    "pr_auc": 0.6033066337523458,
-    "promoted_model_id": "fraud-detector:v1"
+    "pr_auc": 0.6033066337523459,
+    "promoted_model_id": "fraud-detector:v9"
   },
   "decisions": [
     {
       "batch": "prod_1",
       "label_status": "available",
       "observed": {
-        "batch_data_fingerprint": "b85d95b4ae7cccab3f7df22ccfeea108fd267b14b93d0769a8dc876dd8d81167",
+        "batch_data_fingerprint": "5ff41a5eb46b2bdb32ca43ae72c0d968e009e44b3319f121dc7a9e588a8aeec3",
         "operating_threshold": 0.98,
         "pct_drifted_features": 37.9,
         "pr_auc": 0.8099279516362043,
-        "promoted_model_id": "fraud-detector:v1",
+        "promoted_model_id": "fraud-detector:v9",
         "recall": 0.8181818181818182
       },
       "reason_codes": [
@@ -28,11 +28,11 @@
       "batch": "prod_2",
       "label_status": "available",
       "observed": {
-        "batch_data_fingerprint": "306dd582232cb2d228da989a9505e556b9e8266a31f852c93a773a712806f5eb",
+        "batch_data_fingerprint": "bea7e8f3ece0790aedf41727b96f5b8880f028ce0d6725517e4a972b8d8d3f00",
         "operating_threshold": 0.98,
         "pct_drifted_features": 41.4,
         "pr_auc": 0.8353665684036601,
-        "promoted_model_id": "fraud-detector:v1",
+        "promoted_model_id": "fraud-detector:v9",
         "recall": 0.8490566037735849
       },
       "reason_codes": [
@@ -47,11 +47,11 @@
       "batch": "prod_3",
       "label_status": "available",
       "observed": {
-        "batch_data_fingerprint": "4483f420ef000eac5317fcc102a1e6f6f7f69847962b9e4a76d897f60e3bfdd8",
+        "batch_data_fingerprint": "e46006d95543e48cfc069cce01b828a48158ef8fb468cc62bf444e76bcb2b248",
         "operating_threshold": 0.98,
         "pct_drifted_features": 58.6,
         "pr_auc": 0.08812109166011617,
-        "promoted_model_id": "fraud-detector:v1",
+        "promoted_model_id": "fraud-detector:v9",
         "recall": 0.5454545454545454
       },
       "reason_codes": [

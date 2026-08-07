@@ -1,0 +1,138 @@
+{
+  "calibration_data_fingerprint": "1102b1b07bae9a8313b393af983d77d56712df081e5460f1acf3c477e08e50c5",
+  "evidence_role": "model_explainability",
+  "explained_transaction": {
+    "actual_class": 0,
+    "predicted_probability": 0.9999451325766773,
+    "sample_position": 729,
+    "source_row_index": 20413,
+    "top_contributions": [
+      {
+        "feature": "V4",
+        "shap_value": 4.075095929486545
+      },
+      {
+        "feature": "V14",
+        "shap_value": 3.1506662210910155
+      },
+      {
+        "feature": "V17",
+        "shap_value": 2.3178480839642215
+      },
+      {
+        "feature": "V12",
+        "shap_value": 2.258667555529948
+      },
+      {
+        "feature": "V24",
+        "shap_value": 1.305779930851454
+      },
+      {
+        "feature": "Amount",
+        "shap_value": -0.5931942020171027
+      },
+      {
+        "feature": "V22",
+        "shap_value": 0.5907634143992628
+      },
+      {
+        "feature": "V2",
+        "shap_value": 0.5784221085600155
+      },
+      {
+        "feature": "V16",
+        "shap_value": 0.5619917719019092
+      },
+      {
+        "feature": "V6",
+        "shap_value": -0.5555434848528947
+      },
+      {
+        "feature": "V1",
+        "shap_value": 0.4320047599465265
+      },
+      {
+        "feature": "V8",
+        "shap_value": -0.37034114884474795
+      },
+      {
+        "feature": "V9",
+        "shap_value": 0.30357606026852785
+      },
+      {
+        "feature": "V13",
+        "shap_value": -0.291857454875139
+      },
+      {
+        "feature": "V10",
+        "shap_value": 0.2720747349384737
+      }
+    ]
+  },
+  "explainer": "LinearExplainer",
+  "promoted_model_id": "fraud-detector:v9",
+  "sample_size": 2000,
+  "seed": 42,
+  "top_features": [
+    {
+      "feature": "V6",
+      "mean_abs_shap": 1.3863366158650352
+    },
+    {
+      "feature": "V4",
+      "mean_abs_shap": 1.0046470753113683
+    },
+    {
+      "feature": "V24",
+      "mean_abs_shap": 0.947015684499503
+    },
+    {
+      "feature": "V14",
+      "mean_abs_shap": 0.8619262149708081
+    },
+    {
+      "feature": "V22",
+      "mean_abs_shap": 0.757869252065761
+    },
+    {
+      "feature": "Amount",
+      "mean_abs_shap": 0.6867432055412394
+    },
+    {
+      "feature": "V3",
+      "mean_abs_shap": 0.6789298712885279
+    },
+    {
+      "feature": "V1",
+      "mean_abs_shap": 0.6019305561551725
+    },
+    {
+      "feature": "V2",
+      "mean_abs_shap": 0.5683425186834203
+    },
+    {
+      "feature": "V12",
+      "mean_abs_shap": 0.5416199942944405
+    },
+    {
+      "feature": "V16",
+      "mean_abs_shap": 0.5291465889625346
+    },
+    {
+      "feature": "V10",
+      "mean_abs_shap": 0.4823889973350559
+    },
+    {
+      "feature": "V20",
+      "mean_abs_shap": 0.3784962671524904
+    },
+    {
+      "feature": "V8",
+      "mean_abs_shap": 0.34511591449129275
+    },
+    {
+      "feature": "V11",
+      "mean_abs_shap": 0.3015073497724469
+    }
+  ]
+}

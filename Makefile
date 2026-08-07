@@ -27,7 +27,10 @@ threshold: train
 evaluate: threshold
 	python -m src.evaluate
 
-inference: evaluate
+explain: evaluate
+	python -m src.explain
+
+inference: explain
 	python -m src.batch_inference
 
 drift: inference
