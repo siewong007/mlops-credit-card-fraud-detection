@@ -120,7 +120,8 @@ def test_inference_with_target_uses_labeled_contract():
 def test_validate_file_writes_failed_evidence_before_raising(tmp_path):
     raw_path = tmp_path / "raw.csv"
     report_path = tmp_path / "validation_report.json"
-    _frame().to_csv(raw_path, index=False)
+    #_frame().to_csv(raw_path, index=False)
+    _frame().to_csv(raw_path, index=False, lineterminator="\n")
 
     with pytest.raises(DataValidationError):
         validate_file(raw_path, PARAMS, report_path)

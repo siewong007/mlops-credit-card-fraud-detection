@@ -146,7 +146,8 @@ def test_generated_evidence_is_internally_consistent():
             "calibration_data_fingerprint"
         ]
 
-    html = (ROOT / "site" / "index.html").read_text()
+    #html = (ROOT / "site" / "index.html").read_text()
+    html = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
     for marker in (
         f"Model {promoted_model_id}",
         f"MLflow run {promotion['mlflow_run_id']}",
