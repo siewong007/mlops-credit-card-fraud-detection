@@ -157,7 +157,7 @@ implication and note why the notebook is insufficient.
 | 1 | New transaction batches arrive regularly | Repeatable ingestion + scoring | Manual, one-shot execution |
 | 2 | Fraud patterns change over time | Drift / performance monitoring | No monitoring at all |
 | 3 | Fraud is rare | Imbalance-aware evaluation | Uses accuracy-friendly framing |
-| 4 | FN and FP have different cost | Threshold selection + trade-off | Fixed 0.5 threshold |
+| 4 | FN and FP have different cost | Threshold selection + trade-off, and explainable flags for the analysts who work the queue | Fixed 0.5 threshold, no attribution |
 | 5 | Must be reproducible | Pinned env, versioning, seeds | Unpinned, manual |
 | 6 | Detect data-quality issues early | Schema/range/null validation | Trusts input blindly |
 | 7 | Track experiments | Versioned params/metrics/artefacts | Results in cell outputs |
@@ -177,8 +177,9 @@ The reorganised workflow converts each notebook concern into an explicit,
 independently-runnable stage. The full sequence is:
 
 > **Ingest → Validate → Feature processing → Train (≥2 experiments) →
-> Experiment tracking → Evaluate → Threshold selection → Register → Batch
-> inference → Drift monitoring → Retraining trigger → (loop back to Train)**
+> Experiment tracking → Evaluate → Threshold selection → Register → Explain →
+> Batch inference → Drift monitoring → Retraining trigger → (loop back to
+> Train)**
 
 Before-and-after diagrams are in
 [`docs/workflow_diagrams.md`](workflow_diagrams.md). The key structural change is
@@ -194,6 +195,7 @@ a `dvc.yaml` for `dvc repro`). One module per stage lives under `src/`:
 | Training + tracking | `src/train.py` | 3, 7 |
 | Evaluation | `src/evaluate.py` | 3 |
 | Threshold selection | `src/threshold.py` | 4 |
+| Explainability | `src/explain.py` | 4 |
 | Batch inference | `src/batch_inference.py` | 1 |
 | Drift monitoring | `src/drift.py` | 2 |
 | Retraining trigger | `src/retrain_trigger.py` | 8 |
@@ -222,6 +224,11 @@ rubric rewards *appropriate* use, not maximal use.
   available.
 - **Evidently** — rich, human-readable HTML drift reports layered *on top of* the
   native signal (best-effort; the pipeline never depends on it).
+- **SHAP** — model interpretation and audit support (briefing §8). Chosen over
+  reading the logistic-regression coefficients directly because coefficients
+  describe the model in the abstract, while SHAP describes its behaviour on the
+  transactions actually observed — a distinction that turns out to matter for
+  `Amount` (§7.5).
 - **XGBoost + scikit-learn** — the two model families for our ≥2 experiments.
 - **Docker** — a pinned, portable runtime.
 - **DVC** — data and artefact versioning and an alternative one-command
@@ -307,8 +314,8 @@ silently corrupting a model or a prediction.
 
 ### 7.2 Unit tests (requirement, and rubric "systematic testing")
 
-The `tests/` suite (**104 tests across 12 files**, run in CI) covers the logic
-that matters. 102 are evidence-independent and run as `make test-fast` before
+The `tests/` suite (**107 tests across 13 files**, run in CI) covers the logic
+that matters. 105 are evidence-independent and run as `make test-fast` before
 anything else; the remaining 2 are marked `integration` because they read
 generated pipeline evidence. None are skipped — `test_reproducibility.py`
 asserts that no test carries a skip marker, so a silent skip cannot hide a
@@ -327,6 +334,10 @@ failure. The suite covers:
   **feature drift** flags only the shifted features (`test_drift.py`).
 - **Batch inference** produces correctly-thresholded predictions and handles
   batches with or without labels (`test_inference.py`).
+- **Explainability evidence** is correctly ranked, and its `promoted_model_id`
+  and calibration fingerprint match the operating point, so an explanation can
+  never be reported against a different model than the one promoted
+  (`test_explain.py`).
 
 ### 7.3 Imbalance-aware evaluation
 
@@ -369,6 +380,50 @@ sharply cutting false alarms. Crucially, the chosen threshold becomes the
 **operating point** for inference and the **recall baseline** for the trigger —
 the cost trade-off is threaded through the rest of the pipeline rather than being
 a one-off plot.
+
+### 7.5 Explainability (requirement 4, briefing §8)
+
+The threshold decides *how many* transactions enter the review queue, not *why*
+any one of them is in it. The operating point sends 84 calibration transactions
+to analysts of which 66 are false alarms (§7.4), so the analyst working that
+queue needs a reason. `src/explain.py` runs SHAP against the promoted model over
+a seeded 2,000-row sample of the calibration slice, emitting a global
+attribution ranking and a local explanation for the highest-scoring transaction.
+
+**Validating the implementation.** For a linear model SHAP has a closed form —
+attribution equals `coef_j × (x_j − μ_j)` — so mean|SHAP| must equal
+`|coef_j| × E|x_j − μ_j|`. Recomputing that product from the coefficients
+reproduces all 15 top mean|SHAP| values to a ratio of **1.0000**: the stage is
+provably computing SHAP, not something that merely looks like it.
+
+**What SHAP adds beyond the coefficients.** Were the features Gaussian,
+`E|x − μ|` would be `0.798σ` and ranking by `|coef| × σ` would be equivalent.
+Ten of the top 15 sit in a 0.70–0.85 band near that factor; four fall well
+below (V20 0.444, V8 0.480, **Amount 0.490**, V2 0.626). `Amount` is the
+interpretable case: its distribution is strongly right-skewed (skew +9.2), so a
+few very large transactions inflate σ while the typical transaction sits near
+the median. `|coef| × σ` therefore ranks `Amount` **2nd** while SHAP ranks it
+**6th** — coefficient importance credits it with a spread most real
+transactions never exhibit. That gap is the concrete payoff over reading the
+model directly.
+
+**A finding the local explanation forced.** The highest-scoring transaction
+(source row 20413) scores p = 0.999945 and is **actually legitimate** — a
+maximum-confidence false positive, invisible to every aggregate metric. The
+promoted model's probabilities are therefore not calibrated, which means the
+§7.4 threshold is selected over a *monotone score* rather than a trustworthy
+probability: ranking is reliable, absolute confidence is not.
+
+**Interpretability limit.** `V1`–`V28` are PCA components published for
+confidentiality, so SHAP yields valid attribution but not analyst-readable
+reason codes — "V6 was low" is not something an investigator can act on. Only
+`Amount` and `Time` carry business meaning, so the stage is audit support for
+*this* dataset rather than a deployable analyst-facing explanation; the same
+code on non-anonymised features would produce actionable reason codes.
+
+Evidence: `reports/explainability.json`, `reports/figures/shap_summary.png`,
+`reports/figures/shap_local_flagged.png`, consolidated for governance in
+[`docs/MODEL_CARD.md`](MODEL_CARD.md) §6–§7.
 
 ## 8. Monitoring, drift analysis and the retraining trigger
 
@@ -590,10 +645,11 @@ We reorganised a single-notebook fraud-detection experiment into an
 MLOps-enabled workflow in which every stage exists to satisfy a stated
 operational requirement: repeatable ingestion and batching, Pandera validation,
 imbalance-aware training tracked in MLflow with automatic promotion to a model
-registry, cost-based threshold selection, batch inference, native drift and
-performance monitoring with optional Evidently reports, and a justified,
-audit-logged retraining trigger — all pinned, containerised, tested and run
-under CI.
+registry, cost-based threshold selection, SHAP attribution for the review
+queue, batch inference, native drift and performance monitoring with optional
+Evidently reports, and a justified, audit-logged retraining trigger — all
+pinned, containerised, tested and run under CI, with the governance summary
+consolidated in a model card.
 
 **Lessons learned.** First, the hardest part of MLOps is not any single tool but
 the *contracts between stages* — deciding what each stage reads and writes so the
@@ -610,8 +666,9 @@ lost.
 **Future work.** Re-derive the drift threshold on a longer real production stream
 (two days is not enough to separate seasonal from genuine drift); move MLflow to
 a shared server and add automated model promotion gates; expose inference as a
-service with online monitoring; add explainability (e.g. SHAP) to support
-fraud-analyst review and audit; extend the trigger with label-delay-aware
+service with online monitoring; calibrate the promoted model's probabilities
+(isotonic or Platt scaling on a held-out slice), which §7.5 showed to be
+uncalibrated despite reliable ranking; extend the trigger with label-delay-aware
 performance estimation; and tune the models properly (both were left near their
 defaults). The workflow is built to absorb these changes stage by stage — which
 was the whole point of reorganising it.

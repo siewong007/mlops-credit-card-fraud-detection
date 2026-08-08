@@ -19,7 +19,8 @@ maps to an operational requirement, not to a higher accuracy score.
 Validate raw data (Pandera) → Ingest six chronological slices →
 Feature processing → Train ≥2 experiments + promote (MLflow) →
 Select operating threshold (cost-based) → Evaluate default/operating views →
-Batch inference → Drift monitoring (KS/PSI + Evidently) → Review decision
+Explain (SHAP global + local) → Batch inference →
+Drift monitoring (KS/PSI + Evidently) → Review decision
 ```
 
 ## Setup
