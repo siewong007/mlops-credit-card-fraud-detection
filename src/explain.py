@@ -20,7 +20,6 @@ def _build_explainer(model, background: pd.DataFrame):
     if name == "LogisticRegression":
         masker = shap.maskers.Independent(background, max_samples=len(background))
         return shap.LinearExplainer(model, masker), "LinearExplainer"
-        #return shap.LinearExplainer(model, background), "LinearExplainer"
     # Fallback: model-agnostic, slower but always correct.
     return shap.Explainer(model.predict_proba, background), "Explainer"
 
@@ -35,10 +34,9 @@ def _positive_class_values(raw) -> np.ndarray:
     return arr
 
 
-#def explain_probabilities(model, X: pd.DataFrame, cfg: dict) -> tuple[dict, np.ndarray, pd.DataFrame]:
-    #sample = X.sample(n=min(cfg["sample_size"], len(X)), random_state=cfg["seed"])
-def explain_probabilities(model, X: pd.DataFrame, y: pd.Series, cfg: dict) -> tuple[dict, np.ndarray, pd.DataFrame]: #Fixed
-    sample = X.sample(n=min(cfg["sample_size"], len(X)), random_state=cfg["seed"]) #Fixed
+def explain_probabilities(model, X: pd.DataFrame, y: pd.Series,
+                          cfg: dict) -> tuple[dict, np.ndarray, pd.DataFrame]:
+    sample = X.sample(n=min(cfg["sample_size"], len(X)), random_state=cfg["seed"])
     explainer, kind = _build_explainer(model, sample)
     values = _positive_class_values(explainer.shap_values(sample)
                                     if hasattr(explainer, "shap_values")
@@ -57,8 +55,8 @@ def explain_probabilities(model, X: pd.DataFrame, y: pd.Series, cfg: dict) -> tu
                          for f, v in ranking.head(cfg["top_k"]).items()],
         "explained_transaction": {
             "sample_position": flagged,
-            "source_row_index": int(sample.index[flagged]), # Fixed #Added
-            "actual_class": int(y.loc[sample.index[flagged]]), # Added
+            "source_row_index": int(sample.index[flagged]),
+            "actual_class": int(y.loc[sample.index[flagged]]),
             "predicted_probability": float(proba[flagged]),
             "top_contributions": [
                 {"feature": sample.columns[i], "shap_value": float(values[flagged, i])}
@@ -82,24 +80,17 @@ def _plot_summary(values, sample, path) -> None:
     plt.close()
 
 
-#def _plot_local(values, sample, row: int, path) -> None:\ # Fixed # Version 1
-#def _plot_local(values, sample, row: int, path, top_k: int = 15) -> None: # Fixed # Version 2
 def _plot_local(values, sample, row: int, path, top_k: int = 15, actual: str = "") -> None:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    #order = np.argsort(np.abs(values[row]))[::-1][:12][::-1]
     order = np.argsort(np.abs(values[row]))[::-1][:top_k][::-1]
     fig, ax = plt.subplots(figsize=(5.5, 4))
     ax.barh([sample.columns[i] for i in order], [values[row, i] for i in order],
             color=["#c0392b" if values[row, i] > 0 else "#2980b9" for i in order])
     ax.axvline(0, color="black", linewidth=0.8)
-    #ax.set(xlabel="SHAP value (→ pushes toward fraud)",
-           #title="Local explanation — highest-scoring flagged transaction")
-    #ax.set(xlabel="SHAP value (→ pushes toward fraud)", # Fixed # Version 1
-           #title=f"Local explanation — highest-scoring transaction{actual}") # Fixed # Version 1
     ax.set(xlabel="SHAP value (→ pushes toward fraud)")
     ax.set_title(f"Local explanation — highest-scoring transaction\n{actual.strip(' ()')}",
                  fontsize=10)
@@ -124,12 +115,9 @@ def main() -> None:
         expected_sha256=operating_point["calibration_data_fingerprint"],
     )
     model, scaler = load_model(), features.load_scaler()
-    #X, _ = features.xy(features.transform(calibration, scaler))
+    X, y = features.xy(features.transform(calibration, scaler))
 
-    #report, values, sample = explain_probabilities(model, X, cfg)
-    X, y = features.xy(features.transform(calibration, scaler)) # Fixed
-
-    report, values, sample = explain_probabilities(model, X, y, cfg) # Fixed
+    report, values, sample = explain_probabilities(model, X, y, cfg)
     report.update({
         "evidence_role": "model_explainability",
         "promoted_model_id": operating_point["promoted_model_id"],
@@ -139,19 +127,15 @@ def main() -> None:
     print(f"SHAP ({report['explainer']}) on {report['sample_size']} calibration rows")
     for entry in report["top_features"][:10]:
         print(f"  {entry['feature']:>8}: {entry['mean_abs_shap']:.5f}")
-    et = report["explained_transaction"] #Added
-    print(f"  explained row {et['source_row_index']}: p={et['predicted_probability']:.6f}, " # Added
-          f"actual={'fraud' if et['actual_class'] else 'legitimate'}") # Added
+    et = report["explained_transaction"]
+    print(f"  explained row {et['source_row_index']}: p={et['predicted_probability']:.6f}, "
+          f"actual={'fraud' if et['actual_class'] else 'legitimate'}")
 
     write_json(REPORTS_DIR / "explainability.json", report)
     _plot_summary(values, sample, FIGURES_DIR / "shap_summary.png")
-    #_plot_local(values, sample, report["explained_transaction"]["sample_position"],
-                #FIGURES_DIR / "shap_local_flagged.png")
-    #_plot_local(values, sample, report["explained_transaction"]["sample_position"], # Fixed # Version 1
-               #FIGURES_DIR / "shap_local_flagged.png", cfg["top_k"]) # Fixed # Version 1
-    actual = " (actual: fraud)" if report["explained_transaction"]["actual_class"] else " (actual: legitimate)" # Fixed # Version 2
-    _plot_local(values, sample, report["explained_transaction"]["sample_position"], # Fixed # Version 2
-                FIGURES_DIR / "shap_local_flagged.png", cfg["top_k"], actual) # Fixed # Version 2
+    actual = " (actual: fraud)" if et["actual_class"] else " (actual: legitimate)"
+    _plot_local(values, sample, et["sample_position"],
+                FIGURES_DIR / "shap_local_flagged.png", cfg["top_k"], actual)
     print(f"saved explainability evidence + figures to {REPORTS_DIR}")
 
 

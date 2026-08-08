@@ -100,7 +100,7 @@ def test_dvc_graph_tracks_current_artifacts_and_no_retired_paths():
     graph = yaml.safe_load((ROOT / "dvc.yaml").read_text())
     stages = graph["stages"]
     assert set(stages) == {
-        "validate", "ingest", "train", "threshold", "evaluate",
+        "validate", "ingest", "train", "threshold", "evaluate", "explain",
         "inference", "drift", "trigger",
     }
     # DVC erases a stage's outputs before running it, so declaring the raw
@@ -122,6 +122,10 @@ def test_dvc_graph_tracks_current_artifacts_and_no_retired_paths():
         "models/model.joblib", "models/scaler.joblib", "models/threshold.json",
         "data/batches/calibration.csv",
     }.issubset(stages["evaluate"]["deps"])
+    assert {
+        "models/model.joblib", "models/scaler.joblib", "models/threshold.json",
+        "data/batches/calibration.csv",
+    }.issubset(stages["explain"]["deps"])
     assert {
         "models/model.joblib", "models/scaler.joblib", "models/threshold.json",
         "data/batches/calibration.csv",
