@@ -398,14 +398,15 @@ provably computing SHAP, not something that merely looks like it.
 
 **What SHAP adds beyond the coefficients.** Were the features Gaussian,
 `E|x − μ|` would be `0.798σ` and ranking by `|coef| × σ` would be equivalent.
-Ten of the top 15 sit in a 0.70–0.85 band near that factor; four fall well
-below (V20 0.444, V8 0.480, **Amount 0.490**, V2 0.626). `Amount` is the
-interpretable case: its distribution is strongly right-skewed (skew +9.2), so a
-few very large transactions inflate σ while the typical transaction sits near
-the median. `|coef| × σ` therefore ranks `Amount` **2nd** while SHAP ranks it
-**6th** — coefficient importance credits it with a spread most real
-transactions never exhibit. That gap is the concrete payoff over reading the
-model directly.
+Eleven of the top 15 sit in a 0.70–0.85 band near that factor. The four that
+fall well below it are exactly the four heavily skewed features — V20 (0.444,
+skew −5.2), V8 (0.480, −5.3), **Amount** (0.490, +9.2) and V2 (0.626, −4.1) —
+so the deviation tracks non-normality rather than anything about the model.
+`Amount` is the interpretable case: a few very large transactions inflate σ
+while the typical transaction sits near the median, so `|coef| × σ` ranks it
+**2nd** while SHAP ranks it **6th**. Coefficient importance credits `Amount`
+with a spread most real transactions never exhibit. That gap is the concrete
+payoff over reading the model directly.
 
 **A finding the local explanation forced.** The highest-scoring transaction
 (source row 20413) scores p = 0.999945 and is **actually legitimate** — a
