@@ -109,6 +109,30 @@ stages:
       - reports/figures/pr_curve.png:
           cache: false
 
+  explain:
+    cmd: python -m src.explain
+    deps:
+      - src/explain.py
+      - src/artifacts.py
+      - src/features.py
+      - src/validate.py
+      - src/config.py
+      - src/evidence.py
+      - models/model.joblib
+      - models/scaler.joblib
+      - models/threshold.json
+      - data/batches/calibration.csv
+    params:
+      - explain
+    outs:
+      - reports/explainability.json:
+          cache: false
+    plots:
+      - reports/figures/shap_summary.png:
+          cache: false
+      - reports/figures/shap_local_flagged.png:
+          cache: false
+
   inference:
     cmd: python -m src.batch_inference
     deps:

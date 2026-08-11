@@ -18,3 +18,4 @@ dvc==3.67.1
 # Required to read the OpenML Parquet source in src.fetch_data. MLflow 3.14.0
 # requires pyarrow<25, so 21.0.0 is the compatible verified direct pin.
 pyarrow==21.0.0
+shap==0.52.0

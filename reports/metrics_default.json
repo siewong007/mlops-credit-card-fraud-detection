@@ -1,5 +1,5 @@
 {
-  "calibration_data_fingerprint": "1955adeff60672c5a4568c7d28bdd99ec50ccdf9e6e148a1afe90f393609a5c2",
+  "calibration_data_fingerprint": "1102b1b07bae9a8313b393af983d77d56712df081e5460f1acf3c477e08e50c5",
   "estimated_business_cost": 1405.0,
   "evidence_role": "comparison_default_threshold",
   "f1": 0.035171862509992005,
@@ -7,11 +7,11 @@
   "false_positive_rate": 0.04234607815574923,
   "fn": 2,
   "fp": 1205,
-  "pr_auc": 0.6033066337523458,
+  "pr_auc": 0.6033066337523459,
   "precision": 0.017929910350448247,
-  "promoted_model_id": "fraud-detector:v1",
+  "promoted_model_id": "fraud-detector:v9",
   "recall": 0.9166666666666666,
-  "roc_auc": 0.9492154554399774,
+  "roc_auc": 0.9492154554399777,
   "threshold": 0.5,
   "tn": 27251,
   "tp": 22

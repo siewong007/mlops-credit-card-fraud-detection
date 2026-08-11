@@ -42,10 +42,11 @@ flowchart TB
         TR --> EVAL[Imbalance-aware eval<br/>PR-AUC, recall, PR curve]
         EVAL --> THR[Threshold selection<br/>cost-based FN≫FP]
         THR --> REG[Promote + register<br/>MLflow Model Registry]
+        REG --> EXP[Explain<br/>SHAP global + local attribution]
     end
 
     subgraph OPS[Operations plane]
-        REG --> INF[Batch inference<br/>validate → score prod batches]
+        EXP --> INF[Batch inference<br/>validate → score prod batches]
         INF --> DR[Drift monitoring<br/>KS / PSI / performance]
         DR --> TRG{Retraining<br/>trigger}
         TRG -->|ok / warning| KEEP[Keep serving]
@@ -61,12 +62,19 @@ flowchart TB
 
     classDef x fill:#eef,stroke:#3f51b5,color:#000;
     classDef ok fill:#e6ffed,stroke:#27ae60,color:#000;
-    class RAW,ING,VAL,FE,TR,EVAL,THR,REG,INF,DR,TRG,KEEP ok;
+    class RAW,ING,VAL,FE,TR,EVAL,THR,REG,EXP,INF,DR,TRG,KEEP ok;
 ```
 
 The **retrain** edge from the trigger back to training closes the loop: when a
 production batch breaches the trigger rule, the workflow re-enters at the
 training stage to produce an updated model version.
+
+`explain` sits after registration because it attributes the *promoted* model's
+scores, not a candidate's. In the `Makefile` it runs between `evaluate` and
+`inference`; in `dvc.yaml` it is a leaf stage, since its evidence
+(`reports/explainability.json` and the two SHAP figures) is consumed by
+[`docs/MODEL_CARD.md`](MODEL_CARD.md) and by analysts rather than by a
+downstream stage.
 
 ## Requirement → stage mapping
 
@@ -75,7 +83,7 @@ training stage to produce an updated model version.
 | 1 | Regular new transaction batches      | `ingest`, `batch_inference`         |
 | 2 | Fraud patterns change over time      | `drift`, `retrain_trigger`          |
 | 3 | Fraud is rare (~0.172%)              | `evaluate` (PR-AUC/recall), class weights / `scale_pos_weight` in `train` |
-| 4 | Asymmetric FN/FP cost                | `threshold`                         |
+| 4 | Asymmetric FN/FP cost                | `threshold`, `explain` (why a case was flagged) |
 | 5 | Reproducibility                      | Docker, DVC, pinned deps, seeds, CI |
 | 6 | Data-quality checks                  | `validate` (Pandera)                |
 | 7 | Experiment tracking                  | `train` (MLflow + registry)         |

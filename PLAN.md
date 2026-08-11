@@ -23,7 +23,7 @@ in report and slides.
 | 1 | Repeatable ingestion of new batches | Parameterised `src/ingest.py`, DVC-tracked data | `src/ingest.py`, `dvc.yaml` |
 | 2 | Fraud patterns change over time | Evidently drift reports per batch | `src/drift.py` |
 | 3 | Fraud is rare (0.172%) | PR-AUC, recall, precision, confusion matrix; class weights / resampling as experiment | `src/evaluate.py` |
-| 4 | Asymmetric FN/FP costs | Threshold sweep + cost-based selection | `src/threshold.py` |
+| 4 | Asymmetric FN/FP costs                 | Threshold sweep + cost-based selection; SHAP attribution for flagged cases            | `src/threshold.py`, `src/explain.py` |
 | 5 | Reproducibility | Git, pinned `requirements.txt`, Docker, DVC, seeded runs, README | root |
 | 6 | Data quality checks before train/infer | Pandera schema (types, ranges, nulls, target values) | `src/validate.py` |
 | 7 | Experiment tracking | MLflow: params, metrics, artefacts, model registry | `src/train.py` |

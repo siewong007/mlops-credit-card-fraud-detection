@@ -11,6 +11,7 @@ maps to an operational requirement, not to a higher accuracy score.
 - **Demo script:** [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
 - **Reflection template:** [docs/REFLECTION_TEMPLATE.md](docs/REFLECTION_TEMPLATE.md)
 - **Baseline notebook acknowledgement:** [notebooks/README.md](notebooks/README.md)
+- **Model card:** [docs/MODEL_CARD.md](docs/MODEL_CARD.md)
 
 ## Pipeline
 
@@ -18,7 +19,8 @@ maps to an operational requirement, not to a higher accuracy score.
 Validate raw data (Pandera) → Ingest six chronological slices →
 Feature processing → Train ≥2 experiments + promote (MLflow) →
 Select operating threshold (cost-based) → Evaluate default/operating views →
-Batch inference → Drift monitoring (KS/PSI + Evidently) → Review decision
+Explain (SHAP global + local) → Batch inference →
+Drift monitoring (KS/PSI + Evidently) → Review decision
 ```
 
 ## Setup
@@ -130,6 +132,7 @@ verified real-data evidence run.
 | Docker | Reproducible runtime | `Dockerfile` |
 | DVC | Disposable synthetic lineage, parameters, hashes, metrics, and plots | `dvc.yaml`, `make verify-dvc` |
 | Pytest + GitHub Actions | Automated tests + full-pipeline CI | `tests/`, `.github/` |
+| SHAP                    | Global + local attribution for audit support                          | `src/explain.py`              |
 
 ## Repo structure
 

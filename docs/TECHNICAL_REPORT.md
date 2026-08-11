@@ -101,12 +101,12 @@ comes from one authoritative run, recorded in `reports/run_manifest.json`:
 
 | | |
 |---|---|
-| Dataset | `REAL — ULB creditcard via OpenML dataset 1597` |
+| Dataset | `REAL — ULB Credit Card Fraud Detection, downloaded manually from Kaggle (mlg-ulb/creditcardfraud)` |
 | Rows / frauds | 284,807 / 492 (0.1727%) |
-| Data SHA-256 | `1700322b377ac8340ab6b75f22b974944fbcaf5b4f0daf3d5e8f620d96313026` |
-| Source commit | `36b76a0` |
-| Python | 3.13.9 |
-| Promoted model | `fraud-detector:v1` (MLflow run `174fd070411c45f28562d346b253396b`) |
+| Data SHA-256 | `76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89` |
+| Source commit | `211bf75` |
+| Python | 3.13.14 |
+| Promoted model | `fraud-detector:v9` (MLflow run `6d70936c8b7240188f549852a514c86a`) |
 
 The chronological split gives `train` 142,403 rows (269 frauds), `model_valid`
 28,480 (91), `calibration` 28,480 (24), and three production batches of ~28,481
@@ -157,7 +157,7 @@ implication and note why the notebook is insufficient.
 | 1 | New transaction batches arrive regularly | Repeatable ingestion + scoring | Manual, one-shot execution |
 | 2 | Fraud patterns change over time | Drift / performance monitoring | No monitoring at all |
 | 3 | Fraud is rare | Imbalance-aware evaluation | Uses accuracy-friendly framing |
-| 4 | FN and FP have different cost | Threshold selection + trade-off | Fixed 0.5 threshold |
+| 4 | FN and FP have different cost | Threshold selection + trade-off, and explainable flags for the analysts who work the queue | Fixed 0.5 threshold, no attribution |
 | 5 | Must be reproducible | Pinned env, versioning, seeds | Unpinned, manual |
 | 6 | Detect data-quality issues early | Schema/range/null validation | Trusts input blindly |
 | 7 | Track experiments | Versioned params/metrics/artefacts | Results in cell outputs |
@@ -177,8 +177,9 @@ The reorganised workflow converts each notebook concern into an explicit,
 independently-runnable stage. The full sequence is:
 
 > **Ingest → Validate → Feature processing → Train (≥2 experiments) →
-> Experiment tracking → Evaluate → Threshold selection → Register → Batch
-> inference → Drift monitoring → Retraining trigger → (loop back to Train)**
+> Experiment tracking → Evaluate → Threshold selection → Register → Explain →
+> Batch inference → Drift monitoring → Retraining trigger → (loop back to
+> Train)**
 
 Before-and-after diagrams are in
 [`docs/workflow_diagrams.md`](workflow_diagrams.md). The key structural change is
@@ -194,6 +195,7 @@ a `dvc.yaml` for `dvc repro`). One module per stage lives under `src/`:
 | Training + tracking | `src/train.py` | 3, 7 |
 | Evaluation | `src/evaluate.py` | 3 |
 | Threshold selection | `src/threshold.py` | 4 |
+| Explainability | `src/explain.py` | 4 |
 | Batch inference | `src/batch_inference.py` | 1 |
 | Drift monitoring | `src/drift.py` | 2 |
 | Retraining trigger | `src/retrain_trigger.py` | 8 |
@@ -222,6 +224,11 @@ rubric rewards *appropriate* use, not maximal use.
   available.
 - **Evidently** — rich, human-readable HTML drift reports layered *on top of* the
   native signal (best-effort; the pipeline never depends on it).
+- **SHAP** — model interpretation and audit support (briefing §8). Chosen over
+  reading the logistic-regression coefficients directly because coefficients
+  describe the model in the abstract, while SHAP describes its behaviour on the
+  transactions actually observed — a distinction that turns out to matter for
+  `Amount` (§7.5).
 - **XGBoost + scikit-learn** — the two model families for our ≥2 experiments.
 - **Docker** — a pinned, portable runtime.
 - **DVC** — data and artefact versioning and an alternative one-command
@@ -307,8 +314,8 @@ silently corrupting a model or a prediction.
 
 ### 7.2 Unit tests (requirement, and rubric "systematic testing")
 
-The `tests/` suite (**104 tests across 12 files**, run in CI) covers the logic
-that matters. 102 are evidence-independent and run as `make test-fast` before
+The `tests/` suite (**107 tests across 13 files**, run in CI) covers the logic
+that matters. 105 are evidence-independent and run as `make test-fast` before
 anything else; the remaining 2 are marked `integration` because they read
 generated pipeline evidence. None are skipped — `test_reproducibility.py`
 asserts that no test carries a skip marker, so a silent skip cannot hide a
@@ -327,6 +334,10 @@ failure. The suite covers:
   **feature drift** flags only the shifted features (`test_drift.py`).
 - **Batch inference** produces correctly-thresholded predictions and handles
   batches with or without labels (`test_inference.py`).
+- **Explainability evidence** is correctly ranked, and its `promoted_model_id`
+  and calibration fingerprint match the operating point, so an explanation can
+  never be reported against a different model than the one promoted
+  (`test_explain.py`).
 
 ### 7.3 Imbalance-aware evaluation
 
@@ -369,6 +380,39 @@ sharply cutting false alarms. Crucially, the chosen threshold becomes the
 **operating point** for inference and the **recall baseline** for the trigger —
 the cost trade-off is threaded through the rest of the pipeline rather than being
 a one-off plot.
+
+### 7.5 Explainability (requirement 4, briefing §8)
+
+The threshold decides *how many* transactions enter the review queue, not *why*
+any one is in it — and the operating point sends 84 calibration transactions to
+analysts of which 66 are false alarms (§7.4). `src/explain.py` runs SHAP against
+the promoted model over a seeded 2,000-row calibration sample, emitting a global
+ranking and a local explanation for the highest-scoring transaction.
+
+**Validating it.** For a linear model SHAP has a closed form, so mean|SHAP| must
+equal `|coef| × E|x − μ|`. Recomputing that product from the coefficients
+reproduces all 15 top values to a ratio of **1.0000** — the stage provably
+computes SHAP rather than something that merely resembles it.
+
+**What it adds beyond the coefficients.** Were the features Gaussian,
+`E|x − μ|` would be `0.798σ` and ranking by `|coef| × σ` would be equivalent.
+Eleven of the top 15 sit in a 0.70–0.85 band; the four below it are exactly the
+four heavily skewed features (V20 −5.2, V8 −5.3, **Amount** +9.2, V2 −4.1), so
+the deviation tracks non-normality. `Amount` is the interpretable case: a few
+very large transactions inflate σ, so `|coef| × σ` ranks it **2nd** while SHAP
+ranks it **6th**, crediting it with a spread most transactions never exhibit.
+
+**What the local explanation forced.** The highest-scoring transaction (row
+20413) scores p = 0.999945 and is **actually legitimate** — a maximum-confidence
+false positive, invisible to every aggregate metric. The promoted model's
+probabilities are therefore uncalibrated: §7.4's threshold is selected over a
+*monotone score*, not a trustworthy probability.
+
+**Limit.** `V1`–`V28` are PCA components, so SHAP yields valid attribution but
+not analyst-readable reason codes; only `Amount` and `Time` carry business
+meaning. On non-anonymised features the same code would produce actionable
+codes. Evidence: `reports/explainability.json` and the two SHAP figures,
+consolidated in [`docs/MODEL_CARD.md`](MODEL_CARD.md) §6–§7.
 
 ## 8. Monitoring, drift analysis and the retraining trigger
 
@@ -492,38 +536,27 @@ being implicit.
 
 We discuss the risks the briefing asks about honestly:
 
-- **False drift alarms and the KS pitfall.** We hit this directly: at ~28,000
-  rows per batch the Kolmogorov–Smirnov test reports *every* feature as
-  significantly drifted (p < 0.05) for even negligible differences, because
-  statistical significance grows with sample size. Using KS as a binary flag
-  would fire retrain on every batch. We therefore base the drift flag on **PSI**
-  (a magnitude measure, stable across sample sizes) and report KS for
-  information only — and we pair it with a warning band before any hard retrain.
-- **A thin calibration sample.** The operating threshold is selected on the
-  `calibration` slice, which holds 28,480 rows but only **24 frauds** (0.084%) —
-  the chronological split happens to place a low-fraud stretch there. The chosen
-  point rests on 18 true positives and 6 false negatives, so a handful of cases
-  either way would move both the threshold and the reported precision/recall.
-  The *method* is sound and reproducible; the *specific* 0.98 is less precise
-  than three decimal places suggest. With more data we would select the threshold
-  by cross-validation across several time folds rather than one slice.
-- **Delayed fraud labels.** In production, ground-truth fraud labels arrive days
-  or weeks late (chargebacks, investigations). The performance side of the
-  trigger is therefore lagged; feature and prediction drift (which need no
-  labels) act as earlier warnings. The monitoring stage models this explicitly:
-  each batch records a `label_status`, and the trigger emits `LABELS_PENDING`
-  rather than a false all-clear when labels have not yet arrived.
-- **Retraining on poor-quality data.** A retrain fired by a data-quality
-  incident could learn from corrupt data — which is why validation gates every
-  batch first.
-- **Overreacting to short-term variation** and the **operational cost of
-  frequent retraining** — the thresholds and the warning band are tuned to avoid
-  retraining on noise.
-- **Injected vs natural drift.** The `prod_3` shift is a deliberate, labelled
-  injection to exercise the trigger. The 38–41% drift on the other batches is
-  *real* but comes from only two days of data (§2.3) — it is not a substitute for
-  genuine long-term fraud evolution, and the calibrated 50% threshold is specific
-  to this dataset and would be re-derived on a real production stream.
+- **False drift alarms.** At ~28,000 rows per batch, KS flags *every* feature
+  (p < 0.05) on negligible differences, because significance grows with sample
+  size — as a binary flag it would retrain on every batch. We flag on **PSI**, a
+  magnitude measure stable across sample sizes, report KS for information only,
+  and gate hard retrains behind a warning band.
+- **A thin calibration sample.** The threshold rests on 24 frauds (18 true
+  positives, 6 false negatives) in 28,480 rows, so a few cases either way would
+  move both it and the reported precision/recall. The *method* is sound; the
+  *specific* 0.98 is less precise than three decimals suggest. More data would
+  permit cross-validated selection across several time folds.
+- **Delayed fraud labels.** Chargebacks and investigations arrive days to weeks
+  late, so the performance arm lags and label-free drift is the earlier warning.
+  Each batch records a `label_status`, and the trigger emits `LABELS_PENDING`
+  rather than a false all-clear.
+- **Poor-quality retraining data, overreaction to noise, and retraining cost.**
+  Validation gates every batch before it can trigger a retrain, and the
+  thresholds plus warning band exist so short-term variation does not.
+- **Injected vs natural drift.** `prod_3` is a deliberate labelled injection to
+  exercise the trigger; the 38–41% drift elsewhere is *real* but comes from two
+  days of data (§2.3), so the 50% threshold is dataset-specific and would be
+  re-derived on a production stream.
 
 ## 9. Reproducibility and deployment readiness
 
@@ -561,28 +594,25 @@ Reproducibility is treated as a first-class requirement, not an afterthought:
 ### 9.1 Scheduled monitoring and a published dashboard
 
 Because the system is a **batch** pipeline, we simulate operation with a
-scheduled job rather than a hosted prediction API — a closer analogue of how such
-a model actually runs in a bank. `.github/workflows/monitoring.yml` executes
-weekly (and on demand): it fetches the real dataset, runs the pipeline, evaluates
-the retraining trigger, writes the decision table into the workflow run summary,
-raises a **warning annotation** when a batch meets the retrain criteria, archives
-the evidence, and redeploys a static monitoring dashboard to GitHub Pages.
+scheduled job rather than a hosted API — a closer analogue of how such a model
+runs in a bank. `.github/workflows/monitoring.yml` runs weekly and on demand:
+it fetches the real dataset, runs the pipeline, evaluates the trigger, writes
+the decision table into the run summary, raises a **warning annotation** when a
+batch meets the retrain criteria, archives the evidence, and redeploys a static
+dashboard to GitHub Pages.
 
 The dashboard (`src/build_dashboard.py`) renders the same JSON contract the
-trigger consumes — promoted model, operating point, per-batch drift and decisions,
-and the Evidently reports — into a page a non-engineer can read. It always states
-its **data provenance** (a lineage record written by whichever data source ran),
-so synthetic figures can never be presented as real results. This closes the loop
-from "the pipeline produces evidence" to "the evidence is continuously published
-and someone is alerted", which is what monitoring means operationally.
+trigger consumes into a page a non-engineer can read, and always states its
+**data provenance**, so synthetic figures can never be presented as real. This
+closes the loop from "the pipeline produces evidence" to "the evidence is
+published and someone is alerted", which is what monitoring means operationally.
 
-**Prototype limitations.** The MLflow backend is local SQLite and artefacts are
-stored on the local filesystem; a production deployment would use a shared
-tracking server and object storage. Inference is file-based and scheduled, not a
-low-latency service, and the alert is a workflow annotation rather than a pager.
-The dataset, though real, covers only two days (§2.3). None of these change the
-workflow; they are the natural next steps from a course prototype to a production
-system.
+**Prototype limitations.** MLflow runs on local SQLite with filesystem
+artefacts where production would use a shared server and object storage;
+inference is file-based and scheduled rather than low-latency; the alert is a
+workflow annotation, not a pager; and the dataset covers only two days (§2.3).
+None of these change the workflow — they are the steps from course prototype to
+production system.
 
 ## 10. Conclusion
 
@@ -590,10 +620,11 @@ We reorganised a single-notebook fraud-detection experiment into an
 MLOps-enabled workflow in which every stage exists to satisfy a stated
 operational requirement: repeatable ingestion and batching, Pandera validation,
 imbalance-aware training tracked in MLflow with automatic promotion to a model
-registry, cost-based threshold selection, batch inference, native drift and
-performance monitoring with optional Evidently reports, and a justified,
-audit-logged retraining trigger — all pinned, containerised, tested and run
-under CI.
+registry, cost-based threshold selection, SHAP attribution for the review
+queue, batch inference, native drift and performance monitoring with optional
+Evidently reports, and a justified, audit-logged retraining trigger — all
+pinned, containerised, tested and run under CI, with the governance summary
+consolidated in a model card.
 
 **Lessons learned.** First, the hardest part of MLOps is not any single tool but
 the *contracts between stages* — deciding what each stage reads and writes so the
@@ -610,8 +641,9 @@ lost.
 **Future work.** Re-derive the drift threshold on a longer real production stream
 (two days is not enough to separate seasonal from genuine drift); move MLflow to
 a shared server and add automated model promotion gates; expose inference as a
-service with online monitoring; add explainability (e.g. SHAP) to support
-fraud-analyst review and audit; extend the trigger with label-delay-aware
+service with online monitoring; calibrate the promoted model's probabilities
+(isotonic or Platt scaling on a held-out slice), which §7.5 showed to be
+uncalibrated despite reliable ranking; extend the trigger with label-delay-aware
 performance estimation; and tune the models properly (both were left near their
 defaults). The workflow is built to absorb these changes stage by stage — which
 was the whole point of reorganising it.
