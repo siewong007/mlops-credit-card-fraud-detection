@@ -101,12 +101,12 @@ comes from one authoritative run, recorded in `reports/run_manifest.json`:
 
 | | |
 |---|---|
-| Dataset | `REAL — ULB Credit Card Fraud Detection, downloaded manually from Kaggle (mlg-ulb/creditcardfraud)` |
+| Dataset | `REAL — ULB creditcard via OpenML dataset 1597` |
 | Rows / frauds | 284,807 / 492 (0.1727%) |
-| Data SHA-256 | `76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89` |
-| Source commit | `211bf75` |
-| Python | 3.13.14 |
-| Promoted model | `fraud-detector:v9` (MLflow run `6d70936c8b7240188f549852a514c86a`) |
+| Data SHA-256 | `1700322b377ac8340ab6b75f22b974944fbcaf5b4f0daf3d5e8f620d96313026` |
+| Source commit | `c8b2e56` |
+| Python | 3.13.9 |
+| Promoted model | `fraud-detector:v1` (MLflow run `0bbf3589c2ea4592a482e2a6f7d1cca8`) |
 
 The chronological split gives `train` 142,403 rows (269 frauds), `model_valid`
 28,480 (91), `calibration` 28,480 (24), and three production batches of ~28,481

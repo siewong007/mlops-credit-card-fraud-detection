@@ -1,10 +1,10 @@
 {
   "data": {
-    "fingerprint_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+    "fingerprint_sha256": "1700322b377ac8340ab6b75f22b974944fbcaf5b4f0daf3d5e8f620d96313026",
     "fraud": 492,
     "fraud_rate": 0.001727,
     "rows": 284807,
-    "source": "REAL - ULB Credit Card Fraud Detection, downloaded manually from Kaggle (mlg-ulb/creditcardfraud)"
+    "source": "REAL \u2014 ULB creditcard via OpenML dataset 1597"
   },
   "dependencies": {
     "dvc": "3.67.1",
@@ -24,10 +24,10 @@
     "xgboost": "3.3.0"
   },
   "parameters": {
-    "fingerprint_sha256": "a999f2e21fad7d971bafee42aa82b0dc9c3475415a23f7d585dcb642144847db",
+    "fingerprint_sha256": "58246e1bc8a5edaa70f226a10c036d726a357072b8bde33de3a54a7ed99960bc",
     "path": "params.yaml"
   },
-  "python_version": "3.13.14",
+  "python_version": "3.13.9",
   "schema_version": 1,
-  "source_commit": "211bf755211641b2d82ff0b8df1d6cfee1cfdb98"
+  "source_commit": "c8b2e564abf9c3cd88eec14b52394adfcca71a49"
 }

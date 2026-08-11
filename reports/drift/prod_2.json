@@ -2,7 +2,7 @@
   "amount_psi": 0.0041,
   "baseline_target_rate": 0.0018890051473634685,
   "batch": "prod_2",
-  "batch_data_fingerprint": "bea7e8f3ece0790aedf41727b96f5b8880f028ce0d6725517e4a972b8d8d3f00",
+  "batch_data_fingerprint": "306dd582232cb2d228da989a9505e556b9e8266a31f852c93a773a712806f5eb",
   "estimated_business_cost": 831.0,
   "evidently": {
     "error_type": null,
@@ -164,7 +164,7 @@
   "pr_auc": 0.8353665684036601,
   "precision": 0.5921052631578947,
   "prediction_psi": 0.0069,
-  "promoted_model_id": "fraud-detector:v9",
+  "promoted_model_id": "fraud-detector:v1",
   "recall": 0.8490566037735849,
   "target_rate": 0.0018608897159509848,
   "target_rate_delta": -2.8115431412483642e-05

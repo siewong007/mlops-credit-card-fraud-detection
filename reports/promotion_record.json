@@ -1,6 +1,6 @@
 {
-  "data_fingerprint": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
-  "mlflow_run_id": "6d70936c8b7240188f549852a514c86a",
+  "data_fingerprint": "1700322b377ac8340ab6b75f22b974944fbcaf5b4f0daf3d5e8f620d96313026",
+  "mlflow_run_id": "0bbf3589c2ea4592a482e2a6f7d1cca8",
   "model_name": "logistic_regression",
   "model_validation_metrics": {
     "estimated_business_cost": 1891.0,
@@ -17,17 +17,16 @@
     "tn": 27298,
     "tp": 83
   },
-  "parameter_fingerprint": "a999f2e21fad7d971bafee42aa82b0dc9c3475415a23f7d585dcb642144847db",
-  "promoted_model_id": "fraud-detector:v9",
+  "parameter_fingerprint": "58246e1bc8a5edaa70f226a10c036d726a357072b8bde33de3a54a7ed99960bc",
+  "promoted_model_id": "fraud-detector:v1",
   "registered_model_name": "fraud-detector",
-  "registered_model_version": "9",
+  "registered_model_version": "1",
   "selection_reason": "highest model-validation PR-AUC",
   "source_provenance": {
     "fraud": 492,
     "fraud_rate": 0.001727,
-    "note": "Manual download; make fetch-data failed with IncompleteRead from the OpenML mirror.",
-    "retrieved": "2026-08-07",
+    "generated_at": "2026-07-24T17:54:43+00:00",
     "rows": 284807,
-    "source": "REAL - ULB Credit Card Fraud Detection, downloaded manually from Kaggle (mlg-ulb/creditcardfraud)"
+    "source": "REAL \u2014 ULB creditcard via OpenML dataset 1597"
   }
 }

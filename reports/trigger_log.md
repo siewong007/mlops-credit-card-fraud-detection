@@ -1,6 +1,6 @@
 # Retraining review decision log
 
-Promoted model: **fraud-detector:v9**  
+Promoted model: **fraud-detector:v1**  
 Calibration PR-AUC baseline: **0.6033**  
 Operating threshold: **0.98**
 

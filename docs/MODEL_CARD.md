@@ -9,12 +9,12 @@
 | Field | Value |
 | --- | --- |
 | Registered name | `fraud-detector` |
-| Version | `9` (`fraud-detector:v9`) |
+| Version | `1` (`fraud-detector:v1`) |
 | Algorithm | Logistic Regression (scikit-learn 1.7.2) |
-| MLflow run ID | `6d70936c8b7240188f549852a514c86a` |
-| Model URI | `models:/m-335609cc22ed428ebc4a07097f62ae81` |
+| MLflow run ID | `0bbf3589c2ea4592a482e2a6f7d1cca8` |
+| Model URI | `models:/m-2d5d9063ba3244e8bec0c0f37201e565` |
 | Selection reason | Highest model-validation PR-AUC |
-| Source commit | "211bf755211641b2d82ff0b8df1d6cfee1cfdb98" |
+| Source commit | `c8b2e564abf9c3cd88eec14b52394adfcca71a49` |
 | Owner | CY |
 | Card last updated | 2026-08-07 |
 
@@ -38,12 +38,12 @@ that score into a review queue.
 
 | Property | Value |
 | --- | --- |
-| Source | ULB Credit Card Fraud Detection, downloaded from Kaggle (`mlg-ulb/creditcardfraud`) |
+| Source | ULB Credit Card Fraud Detection, via the open OpenML mirror (dataset 1597) |
 | Rows | 284,807 |
 | Fraud cases | 492 (0.1727%) |
 | Features | `Time`, `V1`–`V28` (PCA-transformed), `Amount` |
 | Target | `Class` (1 = fraud) |
-| Data fingerprint | `76274b69…551a89` (SHA-256) |
+| Data fingerprint | `1700322b…313026` (SHA-256) |
 | Split | Time-based, no random shuffling |
 
 Splits: earliest slice trains; `model_valid` selects between candidates;
@@ -66,14 +66,14 @@ Selection metric: `model_validation.pr_auc`.
 
 | | Logistic Regression (**promoted**) | XGBoost |
 | --- | --- | --- |
-| PR-AUC | **0.8652** | 0.8313 |
-| ROC-AUC | 0.9765 | 0.9810 |
-| Recall | 0.9121 | 0.8352 |
-| Precision | 0.0707 | 0.7525 |
-| F1 | 0.1312 | 0.7917 |
-| FP | 1,091 | 25 |
-| FN | 8 | 15 |
-| Estimated cost | 1,891 | **1,525** |
+| PR-AUC | **0.8652** | 0.8345 |
+| ROC-AUC | 0.9765 | 0.9827 |
+| Recall | 0.9121 | 0.8462 |
+| Precision | 0.0707 | 0.7130 |
+| F1 | 0.1312 | 0.7739 |
+| FP | 1,091 | 31 |
+| FN | 8 | 14 |
+| Estimated cost | 1,891 | **1,431** |
 
 The two metrics disagree. PR-AUC is threshold-independent and appropriate for
 extreme imbalance, which justifies its use for selection. However, at the

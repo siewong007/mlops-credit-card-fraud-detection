@@ -118,11 +118,17 @@ def test_generated_evidence_is_internally_consistent():
         assert native["label_status"] == summary["label_status"]
         assert native["evidently"] == summary["evidently"]
 
-    # The manifest must honestly record the interpreter that produced this
-    # evidence. That the *pinned* runtime is 3.13.9 is asserted against the
-    # Dockerfile and both workflows in tests/test_reproducibility.py, so this
-    # does not have to fail on a contributor's differing patch release.
-    assert manifest["python_version"] == platform.python_version()
+    # This suite validates FRESHLY GENERATED evidence — CI runs it immediately
+    # after `make verify`. Run against committed evidence from another machine it
+    # fails here, which is the point: the manifest must describe the run that
+    # produced the files beside it, not some earlier run elsewhere. That the
+    # *pinned* runtime is 3.13.9 is asserted against the Dockerfile and both
+    # workflows in tests/test_reproducibility.py.
+    assert manifest["python_version"] == platform.python_version(), (
+        f"manifest records Python {manifest['python_version']} but this "
+        f"interpreter is {platform.python_version()}; regenerate the evidence "
+        "with `make verify` before running this check"
+    )
     for fingerprint in (
         validation["raw_data_fingerprint"],
         manifest["data"]["fingerprint_sha256"],
