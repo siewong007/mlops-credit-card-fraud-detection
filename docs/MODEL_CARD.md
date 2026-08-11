@@ -135,18 +135,34 @@ Global attribution computed with SHAP `LinearExplainer` over a seeded
 | 7 | V3 | 0.679 |
 
 **Implementation validation.** For a linear model, SHAP value =
-coefficient x (feature - background mean), so mean|SHAP| should equal
-|coef| x E|X - mu|, which for an approximately normal feature is
-|coef| x 0.798 sigma. The observed ratios cluster at 0.71–0.83 across the PCA
-components, confirming the stage is computing SHAP correctly.
+coefficient x (feature - background mean), so mean|SHAP| must equal
+|coef| x E|X - mu|. Recomputing that product directly from the model
+coefficients reproduces all 15 top mean|SHAP| values to a ratio of **1.0000**.
+This is an exact identity, not an approximation, and it is what confirms the
+stage is computing SHAP correctly.
 
-**Where the assumption breaks.** `Amount` shows a ratio of 0.49 and `V20`
-0.44 — well below the Gaussian factor. `Amount` is heavily right-skewed, so its
-standard deviation is inflated by a small number of large transactions while
-most transactions sit near the median. Consequently `Amount` ranks 2nd by
+**Where the Gaussian assumption breaks.** A weaker check compares mean|SHAP|
+against |coef| x sigma. For an approximately normal feature E|X - mu| = 0.798
+sigma, so that ratio should sit near 0.798; deviation from it measures
+non-normality rather than implementation error. Eleven of the top 15 features
+fall in a 0.70–0.85 band. Four sit well below, and all four are heavily skewed:
+
+| Feature | mean\|SHAP\| / (\|coef\| x sigma) | Skew |
+| --- | ---: | ---: |
+| V20 | 0.444 | −5.2 |
+| V8 | 0.480 | −5.3 |
+| **Amount** | **0.490** | **+9.2** |
+| V2 | 0.626 | −4.1 |
+
+`Amount` is the interpretable case. It is strongly right-skewed, so its standard
+deviation is inflated by a small number of large transactions while most
+transactions sit near the median. Consequently `Amount` ranks 2nd by
 |coef| x sigma but only 6th by SHAP. Coefficient-based importance overstates it;
 SHAP reflects its influence on the transactions actually observed. This is the
 clearest case where SHAP adds information beyond reading the coefficients.
+
+Ratios are computed against sigma over the full calibration slice; the SHAP
+values themselves come from the seeded 2,000-row sample.
 
 **Interpretability limit.** V1–V28 are PCA components published for
 confidentiality. SHAP therefore yields statistically valid attribution but not
