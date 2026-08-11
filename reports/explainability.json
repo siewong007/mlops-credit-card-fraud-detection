@@ -1,138 +1,138 @@
 {
-  "calibration_data_fingerprint": "1102b1b07bae9a8313b393af983d77d56712df081e5460f1acf3c477e08e50c5",
+  "calibration_data_fingerprint": "1955adeff60672c5a4568c7d28bdd99ec50ccdf9e6e148a1afe90f393609a5c2",
   "evidence_role": "model_explainability",
   "explained_transaction": {
     "actual_class": 0,
-    "predicted_probability": 0.9999451325766773,
+    "predicted_probability": 0.9999451325766777,
     "sample_position": 729,
     "source_row_index": 20413,
     "top_contributions": [
       {
         "feature": "V4",
-        "shap_value": 4.075095929486545
+        "shap_value": 4.075095929486563
       },
       {
         "feature": "V14",
-        "shap_value": 3.1506662210910155
+        "shap_value": 3.1506662210911642
       },
       {
         "feature": "V17",
-        "shap_value": 2.3178480839642215
+        "shap_value": 2.3178480839680864
       },
       {
         "feature": "V12",
-        "shap_value": 2.258667555529948
+        "shap_value": 2.2586675555301445
       },
       {
         "feature": "V24",
-        "shap_value": 1.305779930851454
+        "shap_value": 1.305779930853953
       },
       {
         "feature": "Amount",
-        "shap_value": -0.5931942020171027
+        "shap_value": -0.593194202019278
       },
       {
         "feature": "V22",
-        "shap_value": 0.5907634143992628
+        "shap_value": 0.5907634143995165
       },
       {
         "feature": "V2",
-        "shap_value": 0.5784221085600155
+        "shap_value": 0.5784221085627641
       },
       {
         "feature": "V16",
-        "shap_value": 0.5619917719019092
+        "shap_value": 0.5619917719021615
       },
       {
         "feature": "V6",
-        "shap_value": -0.5555434848528947
+        "shap_value": -0.5555434848534794
       },
       {
         "feature": "V1",
-        "shap_value": 0.4320047599465265
+        "shap_value": 0.4320047599471604
       },
       {
         "feature": "V8",
-        "shap_value": -0.37034114884474795
+        "shap_value": -0.3703411488445996
       },
       {
         "feature": "V9",
-        "shap_value": 0.30357606026852785
+        "shap_value": 0.30357606026871053
       },
       {
         "feature": "V13",
-        "shap_value": -0.291857454875139
+        "shap_value": -0.2918574548756947
       },
       {
         "feature": "V10",
-        "shap_value": 0.2720747349384737
+        "shap_value": 0.2720747349384471
       }
     ]
   },
   "explainer": "LinearExplainer",
-  "promoted_model_id": "fraud-detector:v9",
+  "promoted_model_id": "fraud-detector:v1",
   "sample_size": 2000,
   "seed": 42,
   "top_features": [
     {
       "feature": "V6",
-      "mean_abs_shap": 1.3863366158650352
+      "mean_abs_shap": 1.386336615866494
     },
     {
       "feature": "V4",
-      "mean_abs_shap": 1.0046470753113683
+      "mean_abs_shap": 1.004647075311373
     },
     {
       "feature": "V24",
-      "mean_abs_shap": 0.947015684499503
+      "mean_abs_shap": 0.9470156845013152
     },
     {
       "feature": "V14",
-      "mean_abs_shap": 0.8619262149708081
+      "mean_abs_shap": 0.8619262149708489
     },
     {
       "feature": "V22",
-      "mean_abs_shap": 0.757869252065761
+      "mean_abs_shap": 0.7578692520660864
     },
     {
       "feature": "Amount",
-      "mean_abs_shap": 0.6867432055412394
+      "mean_abs_shap": 0.6867432055437578
     },
     {
       "feature": "V3",
-      "mean_abs_shap": 0.6789298712885279
+      "mean_abs_shap": 0.6789298712897568
     },
     {
       "feature": "V1",
-      "mean_abs_shap": 0.6019305561551725
+      "mean_abs_shap": 0.601930556156056
     },
     {
       "feature": "V2",
-      "mean_abs_shap": 0.5683425186834203
+      "mean_abs_shap": 0.5683425186861212
     },
     {
       "feature": "V12",
-      "mean_abs_shap": 0.5416199942944405
+      "mean_abs_shap": 0.5416199942944877
     },
     {
       "feature": "V16",
-      "mean_abs_shap": 0.5291465889625346
+      "mean_abs_shap": 0.5291465889627723
     },
     {
       "feature": "V10",
-      "mean_abs_shap": 0.4823889973350559
+      "mean_abs_shap": 0.4823889973350087
     },
     {
       "feature": "V20",
-      "mean_abs_shap": 0.3784962671524904
+      "mean_abs_shap": 0.3784962671533474
     },
     {
       "feature": "V8",
-      "mean_abs_shap": 0.34511591449129275
+      "mean_abs_shap": 0.3451159144911546
     },
     {
       "feature": "V11",
-      "mean_abs_shap": 0.3015073497724469
+      "mean_abs_shap": 0.3015073497726933
     }
   ]
 }
