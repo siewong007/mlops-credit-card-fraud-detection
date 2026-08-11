@@ -30,6 +30,27 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Windows (native)
+
+The commands above assume a POSIX shell. On Windows, use Anaconda Prompt and
+note that two **system** tools are required beyond `requirements.txt`:
+`src/evidence.py` shells out to `git` to record the source commit, and the
+reproducibility test shells out to `make`. Neither is a Python package, and
+neither ships with Windows. In a conda environment:
+
+```cmd
+conda create -n mlops_verify python=3.13 -y
+conda activate mlops_verify
+pip install -r requirements.txt
+conda install -c conda-forge git make -y
+```
+
+Without them you will see `FileNotFoundError: [WinError 2]` from
+`python -m src.evidence` and from
+`tests/test_reproducibility.py::test_make_verify_has_required_gate_order`.
+CI (Ubuntu) and the Docker image supply both already - the Dockerfile installs
+`make` and injects `SOURCE_COMMIT` so `git` is not needed inside the container.
+
 **Data.** The dataset is not committed (144 MB, git-ignored). Two options:
 
 - **Real data (recommended):** `make fetch-data` downloads the genuine ULB
