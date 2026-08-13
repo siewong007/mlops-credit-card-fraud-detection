@@ -327,7 +327,10 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
         step["name"]: step for step in jobs["windows"]["steps"] if "name" in step
     }
     assert jobs["windows"]["runs-on"] == "windows-latest"
-    assert windows_named["Fast unit tests"]["run"] == "make test-fast"
+    assert windows_named["Fast unit tests"]["run"].splitlines() == [
+        'export PATH="/c/Program Files/Git/bin:$PATH"',
+        "make test-fast",
+    ]
     assert windows_named["Fast unit tests"]["shell"] == "bash"
     assert "make" in windows_named["Install GNU make"]["run"]
 

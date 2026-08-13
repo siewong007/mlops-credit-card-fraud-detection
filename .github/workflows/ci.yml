@@ -75,7 +75,9 @@ jobs:
 
       - name: Fast unit tests
         shell: bash
-        run: make test-fast
+        run: |
+          export PATH="/c/Program Files/Git/bin:$PATH"
+          make test-fast
 
   docker:
     runs-on: ubuntu-latest
