@@ -48,6 +48,31 @@ jobs:
             requirements.txt
             dvc-repro/**
 
+  # The README documents a Windows setup path that no Linux job can exercise.
+  # Windows-only breakage — locale-codepage decoding, absent POSIX tools,
+  # backslash paths — otherwise reaches contributors unverified.
+  windows:
+    runs-on: windows-latest
+    env:
+      MPLBACKEND: Agg
+      DISABLE_PANDERA_IMPORT_WARNING: "True"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.9"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      # The suite shells out to `make` to assert the gate order, and Windows
+      # runners ship without it. Chocolatey provides the same GNU make the
+      # README tells Windows contributors to install via conda-forge.
+      - name: Install GNU make
+        run: choco install make --no-progress --yes
+
+      - name: Fast unit tests
+        run: make test-fast
+
   docker:
     runs-on: ubuntu-latest
     steps:

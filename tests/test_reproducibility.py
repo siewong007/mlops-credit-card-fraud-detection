@@ -1,6 +1,8 @@
+import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -59,8 +61,23 @@ def test_runtime_versions_and_docker_contract_are_exact():
 
 def test_make_verify_has_required_gate_order():
     """Removing a pipeline dependency must break the verification command order."""
+    # Without this guard a machine lacking make fails with a bare
+    # `FileNotFoundError: [WinError 2]` from deep inside subprocess, naming
+    # neither the missing tool nor the fix. Windows has no make by default.
+    make = shutil.which("make")
+    if make is None:
+        pytest.fail(
+            "GNU make is not on PATH, so the verification gate order cannot be "
+            "checked. Install it with `conda install -c conda-forge make` on "
+            "Windows (see the README's Windows section), or `apt-get install "
+            "make` on Debian/Ubuntu."
+        )
+    # Run the resolved path, not the bare name: Windows resolves a bare argv[0]
+    # through CreateProcess, which only ever appends .exe, while shutil.which
+    # also honours PATHEXT. Passing the name would let the guard pass and the
+    # call still die with WinError 2 whenever make is not literally make.exe.
     result = subprocess.run(
-        ["make", "-n", "verify"],
+        [make, "-n", "verify"],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -173,7 +190,16 @@ def test_dvc_metadata_has_no_configured_remote():
 
 def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
     jobs = _workflow("ci.yml")["jobs"]
-    assert set(jobs) == {"verify", "docker"}
+    assert set(jobs) == {"verify", "windows", "docker"}
+
+    # The Windows job is what keeps the README's documented Windows path honest,
+    # so assert it actually runs the suite rather than merely existing.
+    windows_named = {
+        step["name"]: step for step in jobs["windows"]["steps"] if "name" in step
+    }
+    assert jobs["windows"]["runs-on"] == "windows-latest"
+    assert windows_named["Fast unit tests"]["run"] == "make test-fast"
+    assert "make" in windows_named["Install GNU make"]["run"]
 
     verify_steps = jobs["verify"]["steps"]
     setup = next(step for step in verify_steps if step.get("uses") == "actions/setup-python@v5")
