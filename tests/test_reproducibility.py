@@ -25,10 +25,11 @@ def _bash_executable():
     git = shutil.which("git")
     if git is None:
         pytest.fail("Git for Windows is required to run the shell-script test")
-    bash = Path(git).parent.parent / "bin" / "bash.exe"
-    if not bash.is_file():
-        pytest.fail(f"Git Bash was not found at {bash}")
-    return str(bash)
+    for parent in Path(git).parents:
+        bash = parent / "bin" / "bash.exe"
+        if bash.is_file():
+            return str(bash)
+    pytest.fail(f"Git Bash was not found above {git}")
 
 
 def _require_real_data(raw_path, provenance_path):
@@ -277,8 +278,14 @@ def test_clean_clone_verifier_fails_when_repro_does_not_converge():
     assert "set -euo pipefail" in commands
 
 
-def test_bash_executable_uses_git_bash_on_windows(monkeypatch, tmp_path):
-    git = tmp_path / "Git" / "cmd" / "git.exe"
+@pytest.mark.parametrize("git_parts", [("cmd",), ("mingw64", "bin")])
+def test_bash_executable_uses_git_bash_on_windows(
+    monkeypatch, tmp_path, git_parts
+):
+    git = tmp_path / "Git"
+    for part in git_parts:
+        git /= part
+    git /= "git.exe"
     bash = tmp_path / "Git" / "bin" / "bash.exe"
     git.parent.mkdir(parents=True)
     bash.parent.mkdir(parents=True)
