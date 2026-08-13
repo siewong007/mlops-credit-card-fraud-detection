@@ -103,7 +103,10 @@ def main() -> None:
             tag = "  <-- drift injected"
         else:
             tag = ""
-        part.to_csv(out_dir / f"{name}.csv", index=False)
+        # Explicit LF: to_csv defaults to os.linesep, so a Windows run would
+        # write CRLF and change every downstream data fingerprint without
+        # changing a single value.
+        part.to_csv(out_dir / f"{name}.csv", index=False, lineterminator="\n")
         print(f"{name}: {len(part)} rows, fraud rate {part['Class'].mean():.5f}{tag}")
 
 

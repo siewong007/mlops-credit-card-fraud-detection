@@ -81,7 +81,7 @@ def main() -> None:
     df = generate(s["n_rows"], s["fraud_rate"], s["random_state"])
     out = ROOT / params["data"]["raw_path"]
     out.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out, index=False)
+    df.to_csv(out, index=False, lineterminator="\n")
     write_provenance(
         params, _SYNTHETIC_SOURCE,
         len(df), int(df["Class"].sum()), include_generated_at=False,

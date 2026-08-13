@@ -196,7 +196,7 @@ def main() -> None:
     out = ROOT / params["data"]["raw_path"]
     out.parent.mkdir(parents=True, exist_ok=True)
     df = fetch()
-    df.to_csv(out, index=False)
+    df.to_csv(out, index=False, lineterminator="\n")
     write_provenance(
         params, "REAL — ULB creditcard via OpenML dataset 1597",
         len(df), int(df["Class"].sum()),
