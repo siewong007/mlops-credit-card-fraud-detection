@@ -62,7 +62,7 @@ def main() -> None:
             promoted_model_id=promoted_model_id,
             batch_data_fingerprint=batch_data_fingerprint,
         )
-        preds.to_csv(bdir / f"preds_{name}.csv", index=False)
+        preds.to_csv(bdir / f"preds_{name}.csv", index=False, lineterminator="\n")
         flagged = int(preds["pred"].sum())
         print(f"{name}: {len(df):,} rows scored, {flagged} flagged as fraud "
               f"(threshold={threshold:.2f})")
