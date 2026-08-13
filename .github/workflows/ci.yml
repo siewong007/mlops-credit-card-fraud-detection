@@ -74,6 +74,7 @@ jobs:
         run: choco install make --no-progress --yes
 
       - name: Fast unit tests
+        shell: bash
         run: make test-fast
 
   docker:
