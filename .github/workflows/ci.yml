@@ -18,10 +18,13 @@ jobs:
       - name: Fast unit tests
         run: make test-fast
 
+      - name: Fetch real dataset (OpenML)
+        run: make fetch-data
+
       - name: DVC clean-clone reproduction
         run: |
           export DVC_REPRO_EXPORT_DIR="$GITHUB_WORKSPACE/dvc-repro"
-          make verify-dvc
+          DVC_REPRO_DATA_MODE=real make verify-dvc
 
       - name: Complete verification
         run: SOURCE_COMMIT="$GITHUB_SHA" make verify
@@ -89,4 +92,4 @@ jobs:
             = "Python 3.13.9"
 
       - name: Run shared verification contract
-        run: docker run --rm fraud-mlops:verify
+        run: docker run --rm fraud-mlops:verify make fetch-data verify

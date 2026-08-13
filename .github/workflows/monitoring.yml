@@ -32,13 +32,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
-      # Prefer the real ULB dataset. If OpenML is unreachable the pipeline falls
-      # back to the synthetic generator (`make data`), and the dashboard states
-      # which dataset produced the figures — it never mislabels synthetic as real.
       - name: Fetch real dataset (OpenML)
-        id: fetch
-        continue-on-error: true
-        run: python -m src.fetch_data
+        run: make fetch-data
 
       - name: Run verified monitoring simulation
         run: SOURCE_COMMIT="$GITHUB_SHA" make verify
@@ -60,11 +55,7 @@ jobs:
           {
             echo "## Monitoring run"
             echo
-            if [ "${{ steps.fetch.outcome }}" = "success" ]; then
-              echo "Dataset: **real ULB (OpenML 1597)**"
-            else
-              echo "Dataset: **synthetic fallback** (OpenML fetch failed)"
-            fi
+            echo "Dataset: **real ULB (OpenML 1597)**"
             echo
             echo "Overall status: **${{ steps.decision.outputs.overall_status }}**"
             echo

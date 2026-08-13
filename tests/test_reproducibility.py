@@ -283,6 +283,7 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
     named = {step["name"]: step for step in verify_steps if "name" in step}
     ordered = [
         "Fast unit tests",
+        "Fetch real dataset (OpenML)",
         "DVC clean-clone reproduction",
         "Complete verification",
         "Evidence consistency",
@@ -293,9 +294,12 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
         names.index(name) for name in ordered
     )
     assert named["Fast unit tests"]["run"] == "make test-fast"
+    fetch = named["Fetch real dataset (OpenML)"]
+    assert fetch["run"] == "make fetch-data"
+    assert "continue-on-error" not in fetch
     assert named["DVC clean-clone reproduction"]["run"].splitlines() == [
         'export DVC_REPRO_EXPORT_DIR="$GITHUB_WORKSPACE/dvc-repro"',
-        "make verify-dvc",
+        "DVC_REPRO_DATA_MODE=real make verify-dvc",
     ]
     assert named["Complete verification"]["run"] == (
         'SOURCE_COMMIT="$GITHUB_SHA" make verify'
@@ -331,7 +335,7 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
     ]["run"]
     assert '= "Python 3.13.9"' in docker_named["Assert exact Python runtime"]["run"]
     assert docker_named["Run shared verification contract"]["run"] == (
-        "docker run --rm fraud-mlops:verify"
+        "docker run --rm fraud-mlops:verify make fetch-data verify"
     )
 
 
@@ -353,7 +357,9 @@ def test_monitoring_workflow_parses_structured_review_status_before_pages_deploy
         "Publish decision to run summary",
         "Upload successful evidence",
     }.issubset(named)
-    assert named["Fetch real dataset (OpenML)"]["continue-on-error"] is True
+    fetch = named["Fetch real dataset (OpenML)"]
+    assert fetch["run"] == "make fetch-data"
+    assert "continue-on-error" not in fetch
     assert named["Run verified monitoring simulation"]["run"] == (
         'SOURCE_COMMIT="$GITHUB_SHA" make verify'
     )
@@ -369,6 +375,9 @@ def test_monitoring_workflow_parses_structured_review_status_before_pages_deploy
     assert 'echo "overall_status=$status" >> "$GITHUB_OUTPUT"' in decision["run"]
 
     summary = named["Publish decision to run summary"]["run"]
+    assert "Dataset: **real ULB (OpenML 1597)**" in summary
+    assert "synthetic fallback" not in summary
+    assert "steps.fetch.outcome" not in summary
     assert "${{ steps.decision.outputs.overall_status }}" in summary
     assert "cat reports/trigger_log.md" in summary
 
