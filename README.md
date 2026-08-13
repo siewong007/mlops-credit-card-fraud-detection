@@ -54,9 +54,23 @@ SOURCE_COMMIT="$(git rev-parse HEAD)" make verify
 ```
 
 Git records the source commit, while `make` drives the verification contract.
-Without either executable, Python reports `FileNotFoundError: [WinError 2]`.
-CI provides both; the Docker image installs `make` and receives
-`SOURCE_COMMIT`, so it does not need Git inside the container.
+Each now reports its own absence: without `make` the suite fails
+`test_make_verify_has_required_gate_order` naming the install command, and
+without Git (and no `SOURCE_COMMIT` set) `src.evidence` raises a `ValueError`
+explaining the same. CI provides both; the Docker image installs `make` and
+receives `SOURCE_COMMIT`, so it does not need Git inside the container.
+
+**Without Anaconda.** `make` is the only thing conda supplies that pip cannot,
+so a plain `python -m venv` environment works just as well once GNU Make is
+installed separately. winget installs it per-user, needing neither conda nor
+administrator rights:
+
+```cmd
+winget install -e --id ezwinports.make --scope user
+```
+
+Reopen the shell afterwards so the updated PATH takes effect. Verified on
+Windows 11 with GNU Make 4.4.1: `make test-fast` then passes in full.
 
 **Data.** The dataset is not committed (144 MB, git-ignored). Two options:
 
