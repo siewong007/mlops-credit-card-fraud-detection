@@ -18,6 +18,19 @@ def _workflow(name):
     return yaml.safe_load((ROOT / ".github" / "workflows" / name).read_text())
 
 
+def _bash_executable():
+    if sys.platform != "win32":
+        return "bash"
+
+    git = shutil.which("git")
+    if git is None:
+        pytest.fail("Git for Windows is required to run the shell-script test")
+    bash = Path(git).parent.parent / "bin" / "bash.exe"
+    if not bash.is_file():
+        pytest.fail(f"Git Bash was not found at {bash}")
+    return str(bash)
+
+
 def _require_real_data(raw_path, provenance_path):
     return subprocess.run(
         [
@@ -264,6 +277,19 @@ def test_clean_clone_verifier_fails_when_repro_does_not_converge():
     assert "set -euo pipefail" in commands
 
 
+def test_bash_executable_uses_git_bash_on_windows(monkeypatch, tmp_path):
+    git = tmp_path / "Git" / "cmd" / "git.exe"
+    bash = tmp_path / "Git" / "bin" / "bash.exe"
+    git.parent.mkdir(parents=True)
+    bash.parent.mkdir(parents=True)
+    git.touch()
+    bash.touch()
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(shutil, "which", lambda command: str(git))
+
+    assert _bash_executable() == str(bash)
+
+
 def test_clean_clone_seed_uses_real_inputs_when_real_mode_requested(tmp_path):
     """Real mode must copy validated inputs instead of invoking the generator."""
     raw = tmp_path / "creditcard.csv"
@@ -286,7 +312,7 @@ seed_dvc_input real "$2" "$3" "$4" "$5"
 """
     result = subprocess.run(
         [
-            "bash",
+            _bash_executable(),
             "-c",
             command,
             "bash",
@@ -327,11 +353,7 @@ def test_ci_workflow_runs_shared_verification_contract_and_docker_proof():
         step["name"]: step for step in jobs["windows"]["steps"] if "name" in step
     }
     assert jobs["windows"]["runs-on"] == "windows-latest"
-    assert windows_named["Fast unit tests"]["run"].splitlines() == [
-        'export PATH="/c/Program Files/Git/bin:$PATH"',
-        "make test-fast",
-    ]
-    assert windows_named["Fast unit tests"]["shell"] == "bash"
+    assert windows_named["Fast unit tests"]["run"] == "make test-fast"
     assert "make" in windows_named["Install GNU make"]["run"]
 
     verify_steps = jobs["verify"]["steps"]

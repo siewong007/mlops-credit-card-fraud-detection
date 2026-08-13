@@ -74,10 +74,7 @@ jobs:
         run: choco install make --no-progress --yes
 
       - name: Fast unit tests
-        shell: bash
-        run: |
-          export PATH="/c/Program Files/Git/bin:$PATH"
-          make test-fast
+        run: make test-fast
 
   docker:
     runs-on: ubuntu-latest
