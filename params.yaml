@@ -13,7 +13,7 @@ data:
   drift_amount_scale: 3.0      # multiply Amount to force feature/amount drift
   drift_feature_shift: 2.5     # shift signal components to force performance drift
 
-# Synthetic dataset generator (dev/CI only). Ignored once the real Kaggle
+# Synthetic dataset generator (local dev/test only). Ignored once the real Kaggle
 # creditcard.csv is placed in data/raw/. See src/simulate_data.py.
 simulate:
   n_rows: 80000

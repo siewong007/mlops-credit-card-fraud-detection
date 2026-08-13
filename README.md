@@ -77,9 +77,10 @@ Windows 11 with GNU Make 4.4.1: `make test-fast` then passes in full.
 - **Real data (recommended):** `make fetch-data` downloads the genuine ULB
   dataset from its open OpenML mirror — **no Kaggle account needed**. (Or drop a
   Kaggle `creditcard.csv` into `data/raw/` yourself.)
-- **Synthetic (offline/CI fallback):** in a clean clone with no raw CSV,
-  `make verify` generates a clearly-labelled deterministic dataset with the
-  identical schema. See [notebooks/README.md](notebooks/README.md) §"data".
+- **Synthetic (local/offline fallback):** in a local clean clone with no raw
+  CSV, `make verify` generates a clearly-labelled deterministic dataset with
+  the identical schema. See [notebooks/README.md](notebooks/README.md) §"data".
+  GitHub Actions always fetches the real dataset and fails if it is unavailable.
 
 ## Run
 
@@ -107,10 +108,11 @@ Verify the DVC lineage safely:
 make verify-dvc
 ```
 
-This archives the exact committed snapshot into a disposable clone and
-reproduces deterministic synthetic lineage there. No DVC remote is configured
-for the real dataset, and the verifier never tracks or overwrites the caller's
-real CSV.
+This archives the exact committed snapshot into a disposable clone and, by
+default, reproduces deterministic synthetic lineage there. CI first fetches the
+real dataset and runs `DVC_REPRO_DATA_MODE=real make verify-dvc`, which validates
+and copies the real inputs into the disposable clone. No DVC remote is configured
+for the dataset, and the verifier never tracks or overwrites the caller's CSV.
 
 Run the same verification contract in the pinned container:
 
@@ -127,7 +129,7 @@ docker build --build-arg SOURCE_COMMIT="$(git rev-parse HEAD)" \
   --tag fraud-mlops:verify .
 test "$(docker run --rm --entrypoint python fraud-mlops:verify --version)" \
   = "Python 3.13.9"
-docker run --rm fraud-mlops:verify
+docker run --rm fraud-mlops:verify make fetch-data verify
 ```
 
 ## Automated monitoring (scheduled) & live dashboard
@@ -139,15 +141,16 @@ rather than a hosted API. [`.github/workflows/monitoring.yml`](.github/workflows
 runs every Monday (and on demand via *Actions → Scheduled monitoring → Run
 workflow*):
 
-1. fetches the real ULB dataset from OpenML — falling back to the synthetic
-   generator if OpenML is unreachable,
+1. fetches the real ULB dataset from OpenML — failing the workflow if it is
+   unreachable or invalid,
 2. runs the complete verification contract,
 3. publishes the trigger table to the run summary and raises a workflow
    **warning annotation** if any batch meets the retrain criteria,
 4. uploads the evidence as a build artefact, and
 5. rebuilds and deploys the dashboard to GitHub Pages.
 
-The dashboard always states its **data provenance**, so synthetic results can
+Scheduled evidence therefore always comes from the real dataset. The dashboard
+also states its **data provenance**, so locally generated synthetic results can
 never be mistaken for real ones. Build it locally with `make dashboard`.
 
 ## What you get (evidence)
@@ -180,7 +183,7 @@ verified real-data evidence run.
 | Evidently | Rich HTML drift reports (best-effort) | `src/drift.py` |
 | XGBoost + scikit-learn | The ≥2 model experiments | `src/train.py` |
 | Docker | Reproducible runtime | `Dockerfile` |
-| DVC | Disposable synthetic lineage, parameters, hashes, metrics, and plots | `dvc.yaml`, `make verify-dvc` |
+| DVC | Disposable real/synthetic lineage, parameters, hashes, metrics, and plots | `dvc.yaml`, `make verify-dvc` |
 | Pytest + GitHub Actions | Automated tests + full-pipeline CI | `tests/`, `.github/` |
 | SHAP                    | Global + local attribution for audit support                          | `src/explain.py`              |
 
@@ -195,7 +198,7 @@ reports/        generated JSON/figure evidence contracts
 docs/           report, diagrams, demo script, reflection template
 models/         promoted model bundle (gitignored, regenerated)
 params.yaml     all knobs: split fractions, models, costs, drift & trigger thresholds
-Makefile        stage orchestration                dvc.yaml   synthetic lineage graph
+Makefile        stage orchestration                dvc.yaml   dataset lineage graph
 Dockerfile      pinned runtime                     requirements.txt  pinned deps
 ```
 

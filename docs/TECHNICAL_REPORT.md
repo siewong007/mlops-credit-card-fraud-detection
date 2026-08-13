@@ -9,7 +9,7 @@
 > and AI assistance must be acknowledged (see §11). The quantitative results
 > below are from the **real ULB dataset** (284,807 transactions), obtained via
 > OpenML with `make fetch-data` (see §2.4). A synthetic generator with the
-> identical schema is retained for CI and offline development.
+> identical schema is retained for local/offline development and isolated tests.
 
 ---
 
@@ -88,13 +88,13 @@ our time-based batching depends on `Time`, we download the raw parquet instead,
 which preserves all 31 columns in the canonical schema. The 144 MB CSV is not
 committed (git-ignored) — teammates and graders regenerate it with one command.
 
-For continuous integration and offline development we also provide
+For local/offline development and isolated tests we also provide
 `src/simulate_data.py`, a **clearly-labelled synthetic** generator with the
 identical schema and a realistic ~0.18% fraud rate, whose fraud class carries a
 learnable signal (a few PCA components mean-shifted, mirroring how `V14`, `V4`,
 `V10`, `V12`, `V17` separate fraud in the real data). It is a fixture, never
-presented as real data, so CI stays fast, deterministic and network-free. Both
-datasets flow through exactly the same pipeline.
+presented as real data. GitHub Actions always fetches the real ULB dataset and
+fails if it is unavailable. Both datasets flow through exactly the same pipeline.
 
 **Provenance of the numbers in this report.** Every quantitative result below
 comes from one authoritative run, recorded in `reports/run_manifest.json`:
@@ -571,13 +571,15 @@ Reproducibility is treated as a first-class requirement, not an afterthought:
   containerised, CI-verified setup is meant to catch.)
 - **Fixed seeds** across data generation, splitting and model training.
 - **Reproducible data** — `make fetch-data` pulls the real dataset from OpenML
-  (no Kaggle account); `src/simulate_data.py` is the offline/CI fallback.
+  (no Kaggle account); `src/simulate_data.py` is the local/offline fallback.
 - **DVC** stage graph (`dvc.yaml`) for artefact versioning. The raw dataset is an
   *input* to the graph, never a stage output: DVC deletes a stage's declared
   outputs before running it, so a stage that generated `data/raw/creditcard.csv`
   would erase a real dataset on every `dvc repro` — unrecoverably, as that file is
   git-ignored with no remote. `make verify-dvc` reproduces the graph inside a
-  disposable clone of the exact commit and never touches the caller's data.
+  disposable clone of the exact commit and never touches the caller's data. CI
+  selects its explicit real-data mode after fetching and validating the ULB
+  inputs; local runs retain the synthetic default.
 - **A single command** — `SOURCE_COMMIT="$(git rev-parse HEAD)" make verify` —
   runs the full workflow in dependency order, regenerates every artefact, builds
   the dashboard and runs the whole test suite.
@@ -586,20 +588,23 @@ Reproducibility is treated as a first-class requirement, not an afterthought:
   dataset and `params.yaml`, so any result can be tied to the inputs that
   produced it.
 - **Continuous integration** (GitHub Actions) installs the pinned environment and
-  runs the same `make verify` contract, plus the clean-clone DVC reproduction and
-  a cross-output evidence-consistency check, uploading the resulting evidence as a
-  build artefact. A second job builds the digest-pinned Docker image, asserts the
-  interpreter is exactly Python 3.13.9, and runs the identical contract inside it.
+  fetches the real ULB dataset before running the same `make verify` contract,
+  the real-data clean-clone DVC reproduction and a cross-output
+  evidence-consistency check. A failed fetch or provenance check fails the job;
+  synthetic data is never substituted. A second job builds the digest-pinned
+  Docker image, asserts the interpreter is exactly Python 3.13.9, then fetches
+  the real dataset and runs the identical contract inside it.
 
 ### 9.1 Scheduled monitoring and a published dashboard
 
 Because the system is a **batch** pipeline, we simulate operation with a
 scheduled job rather than a hosted API — a closer analogue of how such a model
 runs in a bank. `.github/workflows/monitoring.yml` runs weekly and on demand:
-it fetches the real dataset, runs the pipeline, evaluates the trigger, writes
-the decision table into the run summary, raises a **warning annotation** when a
-batch meets the retrain criteria, archives the evidence, and redeploys a static
-dashboard to GitHub Pages.
+it fetches the real dataset, failing without fallback if that prerequisite is
+unavailable, then runs the pipeline, evaluates the trigger, writes the decision
+table into the run summary, raises a **warning annotation** when a batch meets
+the retrain criteria, archives the evidence, and redeploys a static dashboard to
+GitHub Pages.
 
 The dashboard (`src/build_dashboard.py`) renders the same JSON contract the
 trigger consumes into a page a non-engineer can read, and always states its

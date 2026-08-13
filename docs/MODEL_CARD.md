@@ -56,8 +56,9 @@ material to the reliability of the operating point (§7).
 
 Provenance is recorded in `data/raw/PROVENANCE.json` and echoed into
 `reports/run_manifest.json`. When no real dataset is present the pipeline
-generates a clearly-labelled synthetic dataset for dev/CI; synthetic runs are
-never reported as real.
+can generate a clearly-labelled synthetic dataset for local/offline development
+and isolated tests; synthetic runs are never reported as real. GitHub Actions
+always fetches the real ULB dataset and fails if it is unavailable.
 
 ## 4. Candidate comparison
 

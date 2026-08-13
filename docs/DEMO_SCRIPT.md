@@ -135,8 +135,9 @@ you demo on synthetic data instead, say so every time a number appears on screen
 
 - **"Is this real data?"** The genuine ULB dataset (284,807 transactions) via
   OpenML with `make fetch-data`, no Kaggle account needed. A synthetic generator
-  with an identical schema is the offline/CI fallback and is labelled as such
-  everywhere it appears. Report §2.4.
+  with an identical schema supports local/offline development and is labelled as
+  such everywhere it appears. CI fails rather than falling back when real data
+  is unavailable. Report §2.4.
 - **"Why PSI, not KS, for the drift flag?"** At these batch sizes the KS test
   flags essentially every feature as significant for trivial differences. PSI is
   magnitude-based and stable across sample sizes, so it is the flag; KS is

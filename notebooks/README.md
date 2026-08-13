@@ -50,5 +50,7 @@ Results use the **real ULB dataset** (284,807 transactions). Because the Kaggle
 source needs an account, `make fetch-data` (`src/fetch_data.py`) downloads the
 identical data from its open OpenML mirror (dataset 1597). A clearly-labelled
 **synthetic** generator (`src/simulate_data.py`) with the same schema is retained
-as the offline/CI fallback and is never presented as real data. Both flow through
-the same pipeline. This is acknowledged throughout, in line with §18.
+for local/offline development and isolated tests and is never presented as real
+data. GitHub Actions fetches the real dataset and fails if it is unavailable.
+Both datasets flow through the same pipeline. This is acknowledged throughout,
+in line with §18.

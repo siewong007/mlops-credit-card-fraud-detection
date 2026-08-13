@@ -8,7 +8,7 @@ fetch-data:
 
 # Ensure *some* dataset exists: prefer the real CSV if already present,
 # otherwise generate a synthetic one so the pipeline runs out-of-the-box in
-# dev/CI. Use `make fetch-data` for the real dataset.
+# local/offline development. Use `make fetch-data` for the real dataset.
 data:
 	@test -f data/raw/creditcard.csv || python -m src.simulate_data
 
