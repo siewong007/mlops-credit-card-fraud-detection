@@ -2,10 +2,13 @@ import json
 import shutil
 import subprocess
 import sys
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
 import yaml
+
+import scripts.require_real_data as real_data_guard
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,7 +31,7 @@ def _require_real_data(raw_path, provenance_path):
     )
 
 
-def test_real_data_guard_accepts_only_real_data_with_valid_provenance(tmp_path):
+def test_real_data_guard_rejects_missing_invalid_or_non_ulb_inputs(tmp_path):
     """Missing or synthetic inputs must never seed a real-data CI run."""
     raw = tmp_path / "creditcard.csv"
     provenance = tmp_path / "PROVENANCE.json"
@@ -43,13 +46,57 @@ def test_real_data_guard_accepts_only_real_data_with_valid_provenance(tmp_path):
     assert invalid.returncode != 0
     assert "valid provenance" in invalid.stderr
 
-    provenance.write_text(json.dumps({"source": "SYNTHETIC — local test"}))
-    synthetic = _require_real_data(raw, provenance)
-    assert synthetic.returncode != 0
-    assert "not real" in synthetic.stderr
+    for source in (
+        "REALITY — fabricated",
+        "REAL — some other dataset",
+        "SYNTHETIC — local test",
+    ):
+        provenance.write_text(json.dumps({"source": source}))
+        wrong_source = _require_real_data(raw, provenance)
+        assert wrong_source.returncode != 0
+        assert "OpenML dataset 1597" in wrong_source.stderr
 
-    provenance.write_text(json.dumps({"source": "REAL — ULB creditcard"}))
-    assert _require_real_data(raw, provenance).returncode == 0
+
+def test_real_data_guard_rejects_wrong_counts_or_fingerprint(tmp_path):
+    raw = tmp_path / "creditcard.csv"
+    provenance = tmp_path / "PROVENANCE.json"
+    raw.write_text("Class\n0\n")
+
+    for rows, fraud in ((1, 492), (284_807, 0)):
+        provenance.write_text(
+            json.dumps(
+                {"source": real_data_guard.REAL_SOURCE, "rows": rows, "fraud": fraud}
+            )
+        )
+        wrong_counts = _require_real_data(raw, provenance)
+        assert wrong_counts.returncode != 0
+        assert "provenance counts" in wrong_counts.stderr
+
+    provenance.write_text(
+        json.dumps(
+            {"source": real_data_guard.REAL_SOURCE, "rows": 284_807, "fraud": 492}
+        )
+    )
+    wrong_fingerprint = _require_real_data(raw, provenance)
+    assert wrong_fingerprint.returncode != 0
+    assert "fingerprint" in wrong_fingerprint.stderr
+
+
+def test_real_data_guard_accepts_matching_identity_counts_and_fingerprint(tmp_path):
+    raw = tmp_path / "creditcard.csv"
+    provenance = tmp_path / "PROVENANCE.json"
+    raw.write_text("Class\n0\n")
+    provenance.write_text(
+        json.dumps(
+            {"source": real_data_guard.REAL_SOURCE, "rows": 284_807, "fraud": 492}
+        )
+    )
+
+    real_data_guard.require_real_data(
+        raw,
+        provenance,
+        expected_sha256=sha256(raw.read_bytes()).hexdigest(),
+    )
 
 
 def test_runtime_versions_and_docker_contract_are_exact():
@@ -222,8 +269,14 @@ def test_clean_clone_seed_uses_real_inputs_when_real_mode_requested(tmp_path):
     raw = tmp_path / "creditcard.csv"
     provenance = tmp_path / "PROVENANCE.json"
     clone = tmp_path / "clone"
+    guard = tmp_path / "guard.py"
     raw.write_text("Class\n0\n")
     provenance.write_text(json.dumps({"source": "REAL — ULB creditcard"}))
+    guard.write_text(
+        "from pathlib import Path\n"
+        "import sys\n"
+        "Path(sys.argv[1] + '.checked').touch()\n"
+    )
     clone.mkdir()
 
     command = """
@@ -241,13 +294,14 @@ seed_dvc_input real "$2" "$3" "$4" "$5"
             str(raw),
             str(provenance),
             str(clone),
-            str(ROOT / "scripts" / "require_real_data.py"),
+            str(guard),
         ],
         capture_output=True,
         text=True,
     )
 
     assert result.returncode == 0, result.stderr
+    assert (tmp_path / "creditcard.csv.checked").is_file()
     assert (clone / "data" / "raw" / "creditcard.csv").read_text() == raw.read_text()
     assert json.loads(
         (clone / "data" / "raw" / "PROVENANCE.json").read_text()
