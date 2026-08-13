@@ -66,10 +66,17 @@ if [[ "$before" != "$after" ]]; then
 fi
 
 if [[ -n "${DVC_REPRO_EXPORT_DIR:-}" ]]; then
+  # The export must be absolute so it lands outside the disposable clone. A
+  # Windows absolute path carries a drive letter instead of a leading slash,
+  # so C:/out is every bit as absolute as /home/runner/out and was previously
+  # rejected here. Backslash form stays unsupported on purpose: bash treats \
+  # as an escape, so C:\out cannot be normalised without quoting traps, and
+  # the message below names the forms that do work.
   case "$DVC_REPRO_EXPORT_DIR" in
-    /*) ;;
+    /*|[A-Za-z]:/*) ;;
     *)
-      echo "DVC_REPRO_EXPORT_DIR must be an absolute path" >&2
+      echo "DVC_REPRO_EXPORT_DIR must be an absolute path using forward slashes," >&2
+      echo "e.g. /home/you/out, /c/Users/you/out, or C:/Users/you/out" >&2
       exit 2
       ;;
   esac
