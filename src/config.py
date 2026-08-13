@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_params() -> dict:
-    with open(ROOT / "params.yaml") as f:
+    # Explicit encoding: open() otherwise decodes with the locale codepage, so a
+    # non-ASCII character in params.yaml loads on Linux and raises
+    # UnicodeDecodeError on a cp1252 Windows machine.
+    with open(ROOT / "params.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
