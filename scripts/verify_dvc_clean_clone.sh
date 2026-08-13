@@ -1,8 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+seed_dvc_input() {
+  local data_mode="$1"
+  local raw_path="$2"
+  local provenance_path="$3"
+  local clone_root="$4"
+  local guard_path="$5"
+
+  case "$data_mode" in
+    real)
+      python "$guard_path" "$raw_path" "$provenance_path"
+      mkdir -p "$clone_root/data/raw"
+      cp "$raw_path" "$clone_root/data/raw/creditcard.csv"
+      cp "$provenance_path" "$clone_root/data/raw/PROVENANCE.json"
+      ;;
+    synthetic)
+      (cd "$clone_root" && python -m src.simulate_data)
+      ;;
+    *)
+      echo "unknown DVC reproduction data mode: $data_mode" >&2
+      return 2
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return 0
+fi
+
 repo_root="$(git rev-parse --show-toplevel)"
 raw_path="$repo_root/data/raw/creditcard.csv"
+provenance_path="$repo_root/data/raw/PROVENANCE.json"
+data_mode="${DVC_REPRO_DATA_MODE:-synthetic}"
 scratch="$(mktemp -d)"
 
 cleanup() {
@@ -41,9 +71,12 @@ git -C "$repo_root" archive "$source_commit" | tar -x -C "$scratch/repo"
   git add --all
   git commit --quiet -m "isolated verification snapshot"
   export SOURCE_COMMIT="$source_commit"
-  # Seed the graph's raw input. The snapshot carries no CSV (data/raw is
-  # gitignored), so this only ever writes inside the disposable clone.
-  python -m src.simulate_data
+  seed_dvc_input \
+    "$data_mode" \
+    "$raw_path" \
+    "$provenance_path" \
+    "$scratch/repo" \
+    "$repo_root/scripts/require_real_data.py"
   python -m dvc repro
   # Plain `dvc status` always exits 0, so it reports drift without ever failing
   # the gate; it runs first only to put the readable diff in the log. `--quiet`

@@ -1,5 +1,7 @@
+import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,6 +13,43 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def _workflow(name):
     return yaml.safe_load((ROOT / ".github" / "workflows" / name).read_text())
+
+
+def _require_real_data(raw_path, provenance_path):
+    return subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "require_real_data.py"),
+            str(raw_path),
+            str(provenance_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_real_data_guard_accepts_only_real_data_with_valid_provenance(tmp_path):
+    """Missing or synthetic inputs must never seed a real-data CI run."""
+    raw = tmp_path / "creditcard.csv"
+    provenance = tmp_path / "PROVENANCE.json"
+
+    missing = _require_real_data(raw, provenance)
+    assert missing.returncode != 0
+    assert "real dataset is missing" in missing.stderr
+
+    raw.write_text("Class\n0\n")
+    provenance.write_text("not json")
+    invalid = _require_real_data(raw, provenance)
+    assert invalid.returncode != 0
+    assert "valid provenance" in invalid.stderr
+
+    provenance.write_text(json.dumps({"source": "SYNTHETIC — local test"}))
+    synthetic = _require_real_data(raw, provenance)
+    assert synthetic.returncode != 0
+    assert "not real" in synthetic.stderr
+
+    provenance.write_text(json.dumps({"source": "REAL — ULB creditcard"}))
+    assert _require_real_data(raw, provenance).returncode == 0
 
 
 def test_runtime_versions_and_docker_contract_are_exact():
@@ -170,13 +209,49 @@ def test_clean_clone_verifier_fails_when_repro_does_not_converge():
     script = (ROOT / "scripts" / "verify_dvc_clean_clone.sh").read_text()
     commands = [line.strip() for line in script.splitlines()]
     ordered = [
-        "python -m src.simulate_data",  # seeds the graph's raw input
         "python -m dvc repro",
         "python -m dvc status --quiet",  # plain `dvc status` never exits non-zero
     ]
     positions = [commands.index(command) for command in ordered]
     assert positions == sorted(positions)
     assert "set -euo pipefail" in commands
+
+
+def test_clean_clone_seed_uses_real_inputs_when_real_mode_requested(tmp_path):
+    """Real mode must copy validated inputs instead of invoking the generator."""
+    raw = tmp_path / "creditcard.csv"
+    provenance = tmp_path / "PROVENANCE.json"
+    clone = tmp_path / "clone"
+    raw.write_text("Class\n0\n")
+    provenance.write_text(json.dumps({"source": "REAL — ULB creditcard"}))
+    clone.mkdir()
+
+    command = """
+git() { return 99; }
+source "$1"
+seed_dvc_input real "$2" "$3" "$4" "$5"
+"""
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            command,
+            "bash",
+            str(ROOT / "scripts" / "verify_dvc_clean_clone.sh"),
+            str(raw),
+            str(provenance),
+            str(clone),
+            str(ROOT / "scripts" / "require_real_data.py"),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (clone / "data" / "raw" / "creditcard.csv").read_text() == raw.read_text()
+    assert json.loads(
+        (clone / "data" / "raw" / "PROVENANCE.json").read_text()
+    ) == json.loads(provenance.read_text())
 
 
 def test_dvc_metadata_has_no_configured_remote():
