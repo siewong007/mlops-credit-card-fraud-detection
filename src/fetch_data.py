@@ -15,6 +15,7 @@ run, so re-running this module continues from where it stopped.
 
 Usage:  python -m src.fetch_data   (or `make fetch-data`)
 """
+import hashlib
 import time
 import urllib.error
 import urllib.request
@@ -26,6 +27,7 @@ import pandas as pd
 from src.config import ROOT, load_params, write_provenance
 
 PARQUET_URL = "https://data.openml.org/datasets/0000/1597/dataset_1597.pq"
+PARQUET_SHA256 = "b7efcb35a428bbe22347a05d2437d9177bab07ce61e51214a17bec584ad9496d"
 COLS = ["Time"] + [f"V{i}" for i in range(1, 29)] + ["Amount", "Class"]
 
 CHUNK_BYTES = 1 << 20  # 1 MiB
@@ -50,6 +52,15 @@ def _expected_total(response) -> int | None:
     return None
 
 
+def _range_start(response) -> int | None:
+    """First byte in a partial response, or ``None`` if it is malformed."""
+    content_range = response.headers.get("Content-Range", "")
+    start = content_range.removeprefix("bytes ").split("-", 1)[0]
+    if content_range.startswith("bytes ") and start.isdigit():
+        return int(start)
+    return None
+
+
 def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
     """Stream ``url`` to ``dest``, resuming a partial download if one exists."""
     dest = Path(dest) if dest is not None else ROOT / "data" / "raw" / "dataset_1597.pq"
@@ -62,9 +73,13 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         have = part.stat().st_size if part.exists() else 0
-        if total is not None and have >= total:
+        if total is not None and have == total:
             completed = True
             break
+        if total is not None and have > total:
+            raise RuntimeError(
+                f"partial download exceeds expected size: {have:,}/{total:,} bytes"
+            )
 
         request = urllib.request.Request(url)
         if have:
@@ -78,6 +93,10 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
                     have = 0
                     mode = "wb"
                 else:
+                    if response.status == 206 and _range_start(response) != have:
+                        raise RuntimeError(
+                            "server returned an unexpected Content-Range for resume"
+                        )
                     mode = "ab" if have else "wb"
 
                 if total is None:
@@ -100,9 +119,13 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
                                 flush=True,
                             )
             print()
-            if total is None or have >= total:
+            if total is None or have == total:
                 completed = True
                 break
+            if have > total:
+                raise RuntimeError(
+                    f"download exceeds expected size: {have:,}/{total:,} bytes"
+                )
             raise IncompleteRead(b"", total - have)
 
         except urllib.error.HTTPError as exc:
@@ -124,9 +147,11 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
         time.sleep(backoff)
 
     done = part.stat().st_size if part.exists() else 0
-    completed = completed or (total is not None and done >= total)
+    completed = completed or (total is not None and done == total)
     if not completed:
-        progress = f"{done:,}/{total:,} bytes" if total is not None else f"{done:,} bytes"
+        progress = (
+            f"{done:,}/{total:,} bytes" if total is not None else f"{done:,} bytes"
+        )
         raise RuntimeError(
             f"download incomplete after {MAX_ATTEMPTS} attempts: {progress}. "
             f"The partial file is kept at {part} — re-run "
@@ -135,6 +160,16 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
         ) from last_error
     if not done:
         raise RuntimeError(f"download produced no data: {last_error}") from last_error
+
+    if url == PARQUET_URL:
+        with part.open("rb") as handle:
+            actual_sha256 = hashlib.file_digest(handle, "sha256").hexdigest()
+        if actual_sha256 != PARQUET_SHA256:
+            part.unlink()
+            raise RuntimeError(
+                f"OpenML parquet checksum mismatch: expected {PARQUET_SHA256}, "
+                f"got {actual_sha256}; discarded the invalid partial file"
+            )
 
     part.replace(dest)
     return dest

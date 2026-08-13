@@ -7,6 +7,8 @@ mlartifacts/
 mlflow.db
 models/
 data/raw/*.csv
+data/raw/dataset_1597.pq
+data/raw/dataset_1597.pq.part
 data/batches/*.csv
 reports/*.html
 reports/drift/*.html

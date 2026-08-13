@@ -30,26 +30,33 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Windows (native)
+### Windows (Git Bash + conda)
 
-The commands above assume a POSIX shell. On Windows, use Anaconda Prompt and
-note that two **system** tools are required beyond `requirements.txt`:
-`src/evidence.py` shells out to `git` to record the source commit, and the
-reproducibility test shells out to `make`. Neither is a Python package, and
-neither ships with Windows. In a conda environment:
+The pipeline's Makefile uses POSIX shell commands, so run it in **Git Bash**,
+not Command Prompt or PowerShell. Install Git for Windows (which supplies Git
+Bash) and Anaconda or Miniconda. Then create the environment and install GNU
+Make from Anaconda Prompt:
 
 ```cmd
 conda create -n mlops_verify python=3.13 -y
 conda activate mlops_verify
 pip install -r requirements.txt
-conda install -c conda-forge git make -y
+conda install -c conda-forge make -y
+conda init bash
 ```
 
-Without them you will see `FileNotFoundError: [WinError 2]` from
-`python -m src.evidence` and from
-`tests/test_reproducibility.py::test_make_verify_has_required_gate_order`.
-CI (Ubuntu) and the Docker image supply both already - the Dockerfile installs
-`make` and injects `SOURCE_COMMIT` so `git` is not needed inside the container.
+Close the prompt, open Git Bash in the repository, and run the same POSIX
+commands used by CI:
+
+```bash
+conda activate mlops_verify
+SOURCE_COMMIT="$(git rev-parse HEAD)" make verify
+```
+
+Git records the source commit, while `make` drives the verification contract.
+Without either executable, Python reports `FileNotFoundError: [WinError 2]`.
+CI provides both; the Docker image installs `make` and receives
+`SOURCE_COMMIT`, so it does not need Git inside the container.
 
 **Data.** The dataset is not committed (144 MB, git-ignored). Two options:
 

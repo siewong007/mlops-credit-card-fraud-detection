@@ -26,7 +26,9 @@ def _serve(handler):
     return server, server.server_address[1]
 
 
-def _base_handler(*, drops: int, honour_range: bool = True):
+def _base_handler(
+    *, drops: int, honour_range: bool = True, range_start: int | None = None
+):
     state = {"hits": 0}
 
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -39,6 +41,8 @@ def _base_handler(*, drops: int, honour_range: bool = True):
             state["hits"] += 1
             header = self.headers.get("Range")
             start = int(header.split("=")[1].split("-")[0]) if header and honour_range else 0
+            if header and range_start is not None:
+                start = range_start
             body = PAYLOAD[start:]
             if header and honour_range:
                 self.send_response(206)
@@ -147,3 +151,32 @@ def test_failed_resume_keeps_partial_file(tmp_path, monkeypatch):
         server.shutdown()
     assert part.read_bytes() == b"partial"
     assert not dest.exists()
+
+
+def test_rejects_a_response_for_the_wrong_range(tmp_path):
+    dest = tmp_path / "d.pq"
+    part = dest.with_suffix(dest.suffix + ".part")
+    part.write_bytes(PAYLOAD[:200_000])
+    handler = _base_handler(drops=0, range_start=0)
+    server, port = _serve(handler)
+    try:
+        with pytest.raises(RuntimeError, match="unexpected Content-Range"):
+            fetch_data.download(f"http://127.0.0.1:{port}/d.pq", dest=dest)
+    finally:
+        server.shutdown()
+    assert part.read_bytes() == PAYLOAD[:200_000]
+    assert not dest.exists()
+
+
+def test_rejects_the_wrong_openml_checksum(tmp_path, monkeypatch):
+    handler = _base_handler(drops=0)
+    server, port = _serve(handler)
+    url = f"http://127.0.0.1:{port}/d.pq"
+    monkeypatch.setattr(fetch_data, "PARQUET_URL", url)
+    monkeypatch.setattr(fetch_data, "PARQUET_SHA256", "0" * 64, raising=False)
+    try:
+        with pytest.raises(RuntimeError, match="checksum"):
+            fetch_data.download(url, dest=tmp_path / "d.pq")
+    finally:
+        server.shutdown()
+    assert not (tmp_path / "d.pq").exists()
