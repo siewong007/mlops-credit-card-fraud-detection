@@ -100,6 +100,14 @@ real CSV.
 
 Run the same verification contract in the pinned container:
 
+**Optional — requires Docker.** On Windows, Docker Desktop needs the WSL2
+backend and hardware virtualisation enabled, and a managed device may block it
+outright with `[WinError 4551] An Application Control policy has blocked this
+file`. Local Docker is **not** required for reproducibility evidence: CI builds
+this image and runs the identical contract on every push, so the `docker` job in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the authoritative
+record. Skip this section if Docker is unavailable — nothing else depends on it.
+
 ```bash
 docker build --build-arg SOURCE_COMMIT="$(git rev-parse HEAD)" \
   --tag fraud-mlops:verify .
