@@ -123,3 +123,27 @@ def test_does_not_retry_a_missing_url(tmp_path):
     finally:
         server.shutdown()
     assert "404" in str(excinfo.value)
+
+
+def test_failed_resume_keeps_partial_file(tmp_path, monkeypatch):
+    class Unavailable(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):  # noqa: N802
+            self.send_response(500)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    dest = tmp_path / "d.pq"
+    part = dest.with_suffix(dest.suffix + ".part")
+    part.write_bytes(b"partial")
+    monkeypatch.setattr(fetch_data, "MAX_ATTEMPTS", 2)
+    server, port = _serve(Unavailable)
+    try:
+        with pytest.raises(RuntimeError, match="download incomplete"):
+            fetch_data.download(f"http://127.0.0.1:{port}/d.pq", dest=dest)
+    finally:
+        server.shutdown()
+    assert part.read_bytes() == b"partial"
+    assert not dest.exists()

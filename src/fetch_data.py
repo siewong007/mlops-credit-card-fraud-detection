@@ -58,10 +58,12 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
 
     total: int | None = None
     last_error: Exception | None = None
+    completed = False
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         have = part.stat().st_size if part.exists() else 0
         if total is not None and have >= total:
+            completed = True
             break
 
         request = urllib.request.Request(url)
@@ -99,6 +101,7 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
                             )
             print()
             if total is None or have >= total:
+                completed = True
                 break
             raise IncompleteRead(b"", total - have)
 
@@ -121,10 +124,12 @@ def download(url: str = PARQUET_URL, dest: Path | None = None) -> Path:
         time.sleep(backoff)
 
     done = part.stat().st_size if part.exists() else 0
-    if total is not None and done < total:
+    completed = completed or (total is not None and done >= total)
+    if not completed:
+        progress = f"{done:,}/{total:,} bytes" if total is not None else f"{done:,} bytes"
         raise RuntimeError(
-            f"download incomplete after {MAX_ATTEMPTS} attempts: {done:,}/{total:,} "
-            f"bytes. The partial file is kept at {part} — re-run "
+            f"download incomplete after {MAX_ATTEMPTS} attempts: {progress}. "
+            f"The partial file is kept at {part} — re-run "
             f"`python -m src.fetch_data` to resume, or use the manual Kaggle "
             f"path documented in the README."
         ) from last_error
