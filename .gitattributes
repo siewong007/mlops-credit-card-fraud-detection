@@ -1,0 +1,16 @@
+# Git stores text blobs with LF, but a Windows checkout with core.autocrlf=true
+# writes CRLF into the working tree. The evidence contracts fingerprint files by
+# SHA256 over their on-disk bytes, so without this the params.yaml fingerprint --
+# and any future fingerprint over a tracked text file -- depends on which
+# platform performed the checkout rather than on the file's contents.
+#
+# Pinning the working tree to LF everywhere makes those hashes reproducible
+# across platforms. It complements lineterminator="\n" on the pipeline's CSV
+# writers: that covers files the pipeline writes, this covers files git writes.
+* text=auto eol=lf
+
+# Generated binaries: never normalise, never diff as text.
+*.png binary
+*.joblib binary
+*.pq binary
+*.db binary
